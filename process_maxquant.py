@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+import json
+
 import argparse
 
 # columns whose name matches these strings
@@ -29,6 +31,19 @@ PROTEIN_FILTERS = [
     'REV',
     'CON',
 ]
+def load_json(json_filepath):
+    """
+    input:
+    json_filepath = string
+    output:
+    json_object = dict{}
+    parameters:
+    json_file = IO text object
+    """
+    with open(json_filepath) as json_file:
+        json_object = json.load(json_file)
+    
+    return json_object
 
 def process_maxquant(filename):
     """
@@ -121,9 +136,13 @@ def select_proteins(index):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('filename', type=str)
-    
-    args = parser.parse_args()
+    parser.add_argument("filename", help="Group proteins file name", type=str, default="20190115_HEKwt_and_MICS1ko_proteinGroups.txt")
+    parser.add_argument("settings_filename", help="Settings file name", type=str, default="maxquant_settings.json")
+    development_arguments = ["20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "maxquant_settings.json"]
+    args = parser.parse_args(development_arguments)
+
+    #get settings
+    settings_dict = load_json(args.settings_filename)
 
     processed = process_maxquant(args.filename)
     
