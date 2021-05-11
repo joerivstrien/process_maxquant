@@ -1,4 +1,8 @@
 import sys
+import requests
+import urllib.parse
+import urllib.request
+import time
 import pandas as pd
 import numpy as np
 
@@ -173,6 +177,70 @@ def parse_identifier(fasta_header):
         print(f'Parsing a fasta header to get the identifier did not work for:\n{entry}')
         return np.nan
 
+def fetch_uniprot_annotation(identifiers):
+    """
+    input:
+    identifiers = pd.Series
+    output:
+    protein_data_list = list, list of protein_data_dict
+    """
+    #ToDo, tidy up this function and add some print statements telling the user what is happening.
+    protein_data_list = []
+    protein_data_dict = {}
+    base_url = "https://www.ebi.ac.uk/proteins/api/proteins?"
+    hyperlink_base_url = "https://www.uniprot.org/uniprot/"
+    base_request_url = "offset=0&size=100&accession="
+    sleep_time = 2
+    
+    for identifier in identifiers:
+        requestURL = base_url+base_request_url+identifier
+        request = requests.get(requestURL, headers={"Accept" : "application/json"})
+        if not request.ok:
+            print(f"For protein {identifier} something went wrong when getting the uniprot data request. Protein will be ignored")
+            request.raise_for_status()
+            protein_data_dict[identifier] = {"gene_name":np.nan, "protein_name":np.nan, "organism_name":np.nan, "hyperlink":np.nan, "cell_compartment":np.nan, "string_linkout":np.nan}
+            continue
+        else:
+            uniprot_data_dict = request.json()
+            gene_name = uniprot_data_dict[0]["gene"][0]["name"]["value"]
+            protein_name = uniprot_data_dict[0]["protein"]["recommendedName"]["fullName"]["value"]
+            organism_name = uniprot_data_dict[0]["organism"]["names"][0]["value"]
+            hyperlink = hyperlink_base_url+identifier
+            cell_compartment = np.nan
+            string_linkout = get_string_linkout(identifier)
+            protein_data_dict[identifier] = {"gene_name":gene_name,
+                                             "protein_name":protein_name,
+                                             "organism_name":organism_name,
+                                             "hyperlink":hyperlink,
+                                             "cell_compartment":cell_compartment,
+                                             "string_linkout":string_linkout}
+        #Let the program sleep for a bit, else uniprot is going to be overloaded and I get a problem. 
+        print(protein_data_dict[identifier])
+        break
+    protein_data_list.append(protein_data_dict)
+        
+    return protein_data_list
+
+def get_string_linkout(identifier):
+    """
+    Use the uniprot identifier mapping service to get a linkout to the string database.
+    input:
+    identifier = string, uniprot identifier
+    output:
+    string_linkout = string
+    """
+    base_string_url = "https://string-db.org/network/"
+    uniprot_mapping_service_url = 'https://www.uniprot.org/uploadlists/'
+    parameters = {'from': 'ACC+ID', 'to': 'STRING_ID', 'format': 'tab', 'query': identifier}
+
+    data = urllib.parse.urlencode(parameters)
+    data = data.encode('utf-8')
+    request = urllib.request.Request(uniprot_mapping_service_url, data)
+    with urllib.request.urlopen(request) as uniprot_mapping_request:
+       response = uniprot_mapping_request.read()
+    string_linkout = base_string_url+response.decode('utf-8')    
+    return string_linkout
+
 if __name__ == "__main__":
     args = get_user_arguments()
 
@@ -180,11 +248,18 @@ if __name__ == "__main__":
     settings_dict = load_json(args.settings_filename)
     protein_groups_dataframe = read_in_protein_groups_file(args.filename)
 
-    #process maxquant file:
+    #process group proteins file by filtering columns and rows:
     protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict)
     protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict)
     protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
-    
+
+    #fetch annotation for uniprot identifiers:
+    protein_data_list = fetch_uniprot_annotation(protein_groups_dataframe["identifier"])
+    #map proteins to mitocarta:
+
+    #apply hierarchical cluster analysis
+
+    #write away dataframe to an excel file:
     
 
 

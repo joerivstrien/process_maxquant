@@ -1,1 +1,1 @@
-{"EXACT_MATCHES":["Number of proteins", "Razor + unique peptides", "Fasta headers", "PEP", "Intensity", "Mol. weight [kDa]", "Sequence length", "MS/MS Count", "iBAQ"], "CONTAINS":["iBAQ "], "PROTEIN_FILTERS":["REV", "CON"]}
+{"EXACT_MATCHES":["Number of proteins", "Razor + unique peptides", "Fasta headers", "PEP", "Intensity", "Mol. weight [kDa]", "Sequence length", "MS/MS Count", "iBAQ"], "CONTAINS":["iBAQ "], "PROTEIN_FILTERS":["REV", "CON"], "UNIPROT":["sleep_time"]}
