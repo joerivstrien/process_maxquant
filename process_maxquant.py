@@ -6,6 +6,21 @@ import json
 
 import argparse
 
+def get_user_arguments():
+    """
+    Use argparse to get user arguments
+    input:
+    None
+    output:
+    args = argparse object
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("filename", help="Group proteins file name", type=str, default="20190115_HEKwt_and_MICS1ko_proteinGroups.txt")
+    parser.add_argument("settings_filename", help="Settings file name", type=str, default="maxquant_settings.json")
+    development_arguments = ["20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "maxquant_settings.json"]
+
+    args = parser.parse_args(development_arguments)
+    return args
 
 def load_json(json_filepath):
     """
@@ -34,7 +49,7 @@ def read_in_protein_groups_file(filename):
     """
     print(f"Read in \'{filename}\'")
     try:
-        protein_groups_dataframe = pd.read_csv(filename, sep='\t', index_col = 'Majority protein IDs')
+        protein_groups_dataframe = pd.read_csv(filename, sep='\t', index_col = 'Majority protein IDs', low_memory=False)
         number_of_rows = protein_groups_dataframe.shape[0]
         number_of_columns = protein_groups_dataframe.shape[1]
     except FileNotFoundError as file_not_found_error:
@@ -69,6 +84,31 @@ def filter_dataframe_columns(protein_groups_dataframe, settings_dict):
     print(f"Finished removing unwanted columns from the dataframe. The filtered dataframe has {number_of_rows} rows and {number_of_columns} columns")
     print("-"*40)
     return protein_groups_dataframe
+
+def select_columns(all_column_names, selected_column_names, method):
+    """
+    selects columns to keep from list of colnames
+    input:
+    all_column_names = list, list of all column names of the dataframe
+    selected_column_names = list, list of column names to select
+    method = string, in what way does the match have to match? 
+    output:
+    keep_columns = list, list containing columns to retain
+    """
+    keep_columns = []
+
+    for match in selected_column_names:
+        if "exact_matches" == method:
+            keep_column = [column for column in all_column_names if column == match]
+        elif "contains" == method:
+            keep_column = [column for column in all_column_names if column.startswith(match)]
+        else:
+            print(f"In function 'select_columns' the variable name {method} has been passed but isn't a valid method name. Change this to a valid method name")
+            sys.exit()
+        keep_columns += keep_column
+        
+    return keep_columns
+
 def filter_dataframe_rows(protein_groups_dataframe, settings_dict):
     """
     input:
@@ -80,13 +120,28 @@ def filter_dataframe_rows(protein_groups_dataframe, settings_dict):
     print("Start filtering out unwanted proteins and drop proteins containing NA values: ")
     filtered_dataframe_rows = select_proteins(protein_groups_dataframe.index, settings_dict["PROTEIN_FILTERS"])
     protein_groups_dataframe = protein_groups_dataframe.loc[filtered_dataframe_rows]
-    #drop any row containing an NA value:
+    #drop any row containing NA values:
     protein_groups_dataframe = protein_groups_dataframe.dropna(axis="index")
     number_of_rows = protein_groups_dataframe.shape[0]
     number_of_columns = protein_groups_dataframe.shape[1]
     print(f"Finished filtering out unwanted proteins. The filtered dataframe has {number_of_rows} rows and {number_of_columns} columns")
     print("-"*40)
     return protein_groups_dataframe
+
+def select_proteins(row_labels_index, protein_filters):
+    """
+    selects proteins to keep using index and protein_filter
+    input:
+    row_labels_index = pd.DataFrame().index, the row labels(in this case 'Majority protein IDs') of the dataframe
+    protein_filters = list, list of filters 
+    output:
+    keep_proteins = list, list with rows to keep
+    """
+    keep_proteins = row_labels_index
+    for protein_filter in protein_filters:
+        keep_proteins = [protein for protein in keep_proteins if not protein_filter in protein]
+
+    return keep_proteins
 
 def fetch_identifiers(protein_groups_dataframe):
     """
@@ -117,55 +172,10 @@ def parse_identifier(fasta_header):
         print(f'Parsing a fasta header to get the identifier did not work for:\n{entry}')
         return np.nan
 
-def select_columns(all_column_names, selected_column_names, method):
-    """
-    selects columns to keep from list of colnames
-    input:
-    all_column_names = list, list of all column names of the dataframe
-    selected_column_names = list, list of column names to select
-    method = string, in what way does the match have to match? 
-    output:
-    keep_columns = list, list containing columns to retain
-    """
-    keep_columns = []
-
-    for match in selected_column_names:
-        if "exact_matches" == method:
-            keep_column = [column for column in all_column_names if column == match]
-        elif "contains" == method:
-            keep_column = [column for column in all_column_names if column.startswith(match)]
-        else:
-            print(f"In function 'select_columns' the variable name {method} has been passed but isn't a valid method name. Change this to a valid method name")
-            sys.exit()
-        keep_columns += keep_column
-        
-    return keep_columns
-
-def select_proteins(row_labels_index, protein_filters):
-    """
-    selects proteins to keep using index and protein_filter
-    input:
-    row_labels_index = pd.DataFrame().index, the row labels(in this case 'Majority protein IDs') of the dataframe
-    protein_filters = list, list of filters 
-    output:
-    keep_proteins = list, list with rows to keep
-    """
-    keep_proteins = row_labels_index
-    for protein_filter in protein_filters:
-        keep_proteins = [protein for protein in keep_proteins if not protein_filter in protein]
-
-    return keep_proteins
-
 if __name__ == "__main__":
+    args = get_user_arguments()
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("filename", help="Group proteins file name", type=str, default="20190115_HEKwt_and_MICS1ko_proteinGroups.txt")
-    parser.add_argument("settings_filename", help="Settings file name", type=str, default="maxquant_settings.json")
-    development_arguments = ["20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "maxquant_settings.json"]
-
-    args = parser.parse_args(development_arguments)
-
-    #get settings
+    #Read in files:
     settings_dict = load_json(args.settings_filename)
     protein_groups_dataframe = read_in_protein_groups_file(args.filename)
 
@@ -173,5 +183,10 @@ if __name__ == "__main__":
     protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict)
     protein_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict)
     protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
+
+    
+
+
+
     
     # processed.to_csv('processed_out.tsv', sep='\t')
