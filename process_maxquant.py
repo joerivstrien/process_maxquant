@@ -47,15 +47,14 @@ def read_in_protein_groups_file(filename):
     print(f"Succesfully read in \'{filename}\' and created a dataframe. The dataframe has {number_of_rows} rows and {number_of_columns} columns")
     print("-"*40)
     return protein_groups_dataframe
-    
-def process_maxquant(protein_groups_dataframe, settings_dict):
+
+def filter_dataframe_columns(protein_groups_dataframe, settings_dict):
     """
-    main function that processes maxquant protein-groups file
     input:
-    protein_groups_dataframe = pd.DataFrame()
-    settings_dict = dict{setting : value}, dict containing parameter settings for this search. 
+    protein_groups_dataframe = pd.DataFrame
+    settings_dict = dict{parameter: [values]}
     output:
-    processed_dataframe = pd.DataFrame()
+    protein_groups_dataframe = pd.DataFrame
     """
     print("Start removing unwanted columns from the dataframe:")
     all_dataframe_columns = list(protein_groups_dataframe.columns)
@@ -69,7 +68,15 @@ def process_maxquant(protein_groups_dataframe, settings_dict):
     number_of_columns = protein_groups_dataframe.shape[1]
     print(f"Finished removing unwanted columns from the dataframe. The filtered dataframe has {number_of_rows} rows and {number_of_columns} columns")
     print("-"*40)
-    
+    return protein_groups_dataframe
+def filter_dataframe_rows(protein_groups_dataframe, settings_dict):
+    """
+    input:
+    protein_groups_dataframe = pd.DataFrame
+    settings_dict = dict{parameter: [values]}
+    output:
+    protein_groups_dataframe = pd.DataFrame
+    """
     print("Start filtering out unwanted proteins and drop proteins containing NA values: ")
     filtered_dataframe_rows = select_proteins(protein_groups_dataframe.index, settings_dict["PROTEIN_FILTERS"])
     protein_groups_dataframe = protein_groups_dataframe.loc[filtered_dataframe_rows]
@@ -79,12 +86,20 @@ def process_maxquant(protein_groups_dataframe, settings_dict):
     number_of_columns = protein_groups_dataframe.shape[1]
     print(f"Finished filtering out unwanted proteins. The filtered dataframe has {number_of_rows} rows and {number_of_columns} columns")
     print("-"*40)
+    return protein_groups_dataframe
 
+def fetch_identifiers(protein_groups_dataframe):
+    """
+    input:
+    protein_groups_dataframe = pd.DataFrame
+    output:
+    protein_groups_dataframe = pd.DataFrame
+    """
     print("Start fetching identifiers: ")
     protein_groups_dataframe['identifier'] = protein_groups_dataframe['Fasta headers'].apply(parse_identifier)
     print("Finished fetching identifiers. Please see the first 5 rows of the dataframe: ")
     print(protein_groups_dataframe.head())
-
+    print("-"*40)
     return protein_groups_dataframe
 
 def parse_identifier(fasta_header):
@@ -154,6 +169,9 @@ if __name__ == "__main__":
     settings_dict = load_json(args.settings_filename)
     protein_groups_dataframe = read_in_protein_groups_file(args.filename)
 
-    processed_dataframe = process_maxquant(protein_groups_dataframe, settings_dict)
+    #process maxquant file:
+    protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict)
+    protein_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict)
+    protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
     
     # processed.to_csv('processed_out.tsv', sep='\t')
