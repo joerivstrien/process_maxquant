@@ -118,30 +118,31 @@ def filter_dataframe_rows(protein_groups_dataframe, settings_dict):
     protein_groups_dataframe = pd.DataFrame
     """
     print("Start filtering out unwanted proteins and drop proteins containing NA values: ")
-    filtered_dataframe_rows = select_proteins(protein_groups_dataframe.index, settings_dict["PROTEIN_FILTERS"])
-    protein_groups_dataframe = protein_groups_dataframe.loc[filtered_dataframe_rows]
+    non_applying_rows, applying_rows = select_proteins(protein_groups_dataframe.index, settings_dict["PROTEIN_FILTERS"])
+    filtered_groups_dataframe = protein_groups_dataframe.loc[applying_rows]
+    protein_groups_dataframe = protein_groups_dataframe.loc[non_applying_rows]
     #drop any row containing NA values:
     protein_groups_dataframe = protein_groups_dataframe.dropna(axis="index")
     number_of_rows = protein_groups_dataframe.shape[0]
     number_of_columns = protein_groups_dataframe.shape[1]
     print(f"Finished filtering out unwanted proteins. The filtered dataframe has {number_of_rows} rows and {number_of_columns} columns")
     print("-"*40)
-    return protein_groups_dataframe
+    return protein_groups_dataframe, filtered_groups_dataframe
 
 def select_proteins(row_labels_index, protein_filters):
     """
-    selects proteins to keep using index and protein_filter
+    selects proteins to keep using index and protein_filter, but keep proteins which do not apply to the filter.
     input:
     row_labels_index = pd.DataFrame().index, the row labels(in this case 'Majority protein IDs') of the dataframe
     protein_filters = list, list of filters 
     output:
     keep_proteins = list, list with rows to keep
     """
-    keep_proteins = row_labels_index
     for protein_filter in protein_filters:
-        keep_proteins = [protein for protein in keep_proteins if not protein_filter in protein]
-
-    return keep_proteins
+        non_applying_proteins = [row for row in row_labels_index if not protein_filter in row]
+        applying_proteins = [row for row in row_labels_index if protein_filter in row]
+        
+    return non_applying_proteins, applying_proteins
 
 def fetch_identifiers(protein_groups_dataframe):
     """
@@ -181,9 +182,9 @@ if __name__ == "__main__":
 
     #process maxquant file:
     protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict)
-    protein_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict)
+    protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict)
     protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
-
+    
     
 
 
