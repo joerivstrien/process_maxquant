@@ -5,32 +5,32 @@ import json
 
 import argparse
 
-# columns whose name matches these strings
-# exactly are kept
-EXACT_MATCHES = [
-    # 'Majority protein IDs',
-    'Number of proteins',
-    'Razor + unique peptides',
-    'Fasta headers',
-    'PEP',
-    'Intensity',
-    'Mol. weight [kDa]',
-    'Sequence length',
-    'MS/MS Count'
-    'iBAQ',
-]
-
-# columns containing these strings are kept
-CONTAINS = [
-    'iBAQ ',
-]
-
-# proteins whose name contains one of these
-#  strings it is filtered out
-PROTEIN_FILTERS = [
-    'REV',
-    'CON',
-]
+### columns whose name matches these strings
+### exactly are kept
+##EXACT_MATCHES = [
+##    # 'Majority protein IDs',
+##    'Number of proteins',
+##    'Razor + unique peptides',
+##    'Fasta headers',
+##    'PEP',
+##    'Intensity',
+##    'Mol. weight [kDa]',
+##    'Sequence length',
+##    'MS/MS Count'
+##    'iBAQ',
+##]
+##
+### columns containing these strings are kept
+##CONTAINS = [
+##    'iBAQ ',
+##]
+##
+### proteins whose name contains one of these
+###  strings it is filtered out
+##PROTEIN_FILTERS = [
+##    'REV',
+##    'CON',
+##]
 def load_json(json_filepath):
     """
     input:
@@ -41,23 +41,45 @@ def load_json(json_filepath):
     json_file = IO text object
     """
     with open(json_filepath) as json_file:
-        json_object = json.load(json_file)
-    
+        try:
+            json_object = json.load(json_file)
+        except FileNotFoundError as file_not_found_error:
+            print(file_not_found_error)
+        except Exception as error:
+            print("A unhandled error has occurred while reading {json_file_path}, please see error belows:")
+            print(error)
     return json_object
-
-def process_maxquant(filename):
+def read_in_protein_groups_file(filename):
+    """
+    input:
+    string, path of proteingroups file
+    output:
+    protein_groups_dataframe = pd.DataFrame
+    """
+    print(f"Read in {filename}")
+    try:
+        protein_groups_dataframe = pd.read_csv(filename, sep='\t', index_col = 'Majority protein IDs')
+    except FileNotFoundError as file_not_found_error:
+        print(file_not_found_error)
+    except IOError as io_error:
+        print(io_error)
+    except Exception as error:
+        print("Something went wrong while reading in {filename}, please see the error below:")
+        print(error)
+    print("Succesfully read in {filename} and created a dataframe. The dataframe has {0} rows and {1} columns".format(protein_groups_dataframe.shape[0], protein_groups_dataframe.shape[1]))
+    print("-"*40)
+    return protein_groups_dataframe
+    
+def process_maxquant(filename, settings_dict):
     """
     main function that processes maxquant protein-groups file
-
-    Args:
-        filename: path/filename of proteingroups file
-    
-    Returns:
-        processed dataframe
+    input:
+    filename = string, path of proteingroups file
+    settings_dict = dict{setting : value}, dict containing parameter settings for this search. 
+    output:
+    processed_dataframe = pd.DataFrame()
     """
- 
-    data = pd.read_csv(filename, sep='\t', index_col = 'Majority protein IDs')
-    print(data.shape)
+    protein_groups_dataframe = read_in_protein_groups_file(filename)
 
     # select columns to keep
     columns = list(data.columns)
@@ -139,11 +161,12 @@ if __name__ == "__main__":
     parser.add_argument("filename", help="Group proteins file name", type=str, default="20190115_HEKwt_and_MICS1ko_proteinGroups.txt")
     parser.add_argument("settings_filename", help="Settings file name", type=str, default="maxquant_settings.json")
     development_arguments = ["20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "maxquant_settings.json"]
+
     args = parser.parse_args(development_arguments)
 
     #get settings
     settings_dict = load_json(args.settings_filename)
 
-    processed = process_maxquant(args.filename)
+    processed = process_maxquant(args.filename, settings_dict)
     
     # processed.to_csv('processed_out.tsv', sep='\t')
