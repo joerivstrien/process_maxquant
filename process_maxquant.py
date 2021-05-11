@@ -1,3 +1,4 @@
+import sys
 import pandas as pd
 import numpy as np
 
@@ -56,36 +57,43 @@ def read_in_protein_groups_file(filename):
     output:
     protein_groups_dataframe = pd.DataFrame
     """
-    print(f"Read in {filename}")
+    print(f"Read in \'{filename}\'")
     try:
         protein_groups_dataframe = pd.read_csv(filename, sep='\t', index_col = 'Majority protein IDs')
+        number_of_rows = protein_groups_dataframe.shape[0]
+        number_of_columns = protein_groups_dataframe.shape[1]
     except FileNotFoundError as file_not_found_error:
         print(file_not_found_error)
     except IOError as io_error:
         print(io_error)
     except Exception as error:
-        print("Something went wrong while reading in {filename}, please see the error below:")
+        print(f"Something went wrong while reading in \'{filename}\', please see the error below:")
         print(error)
-    print("Succesfully read in {filename} and created a dataframe. The dataframe has {0} rows and {1} columns".format(protein_groups_dataframe.shape[0], protein_groups_dataframe.shape[1]))
+    print(f"Succesfully read in \'{filename}\' and created a dataframe. The dataframe has {number_of_rows} rows and {number_of_columns} columns")
     print("-"*40)
     return protein_groups_dataframe
     
-def process_maxquant(filename, settings_dict):
+def process_maxquant(protein_groups_dataframe, settings_dict):
     """
     main function that processes maxquant protein-groups file
     input:
-    filename = string, path of proteingroups file
+    protein_groups_dataframe = pd.DataFrame()
     settings_dict = dict{setting : value}, dict containing parameter settings for this search. 
     output:
     processed_dataframe = pd.DataFrame()
     """
-    protein_groups_dataframe = read_in_protein_groups_file(filename)
-
+    
     # select columns to keep
-    columns = list(data.columns)
-    columns = select_columns(columns)
-    data=data[columns]
-    print(data.shape)
+    print("Start removing unwanted columns from the dataframe:")
+    all_dataframe_columns = list(protein_groups_dataframe.columns)
+    selected_dataframe_columns = select_columns(all_dataframe_columns, settings_dict["EXACT_MATCHES"], "exact_matches")
+    selected_dataframe_columns = select_columns(all_dataframe_columns, settings_dict["CONTAINS"], "contains")
+    
+    protein_groups_dataframe = protein_groups_dataframe[selected_dataframe_columns]
+    number_of_rows = protein_groups_dataframe.shape[0]
+    number_of_columns = protein_groups_dataframe.shape[1]
+    print(f"Finished removing unwanted columns from the dataframe. The filtered dataframe has {number_of_rows} rows an {number_of_columns} columns")
+    print("-"*40)
 
     # filter unwanted proteins
     proteins = select_proteins(data.index)
@@ -115,29 +123,29 @@ def parse_identifier(entry):
         return np.nan
     return result    
 
-def select_columns(columns):
+def select_columns(all_column_names, selected_column_names, method):
     """
     selects columns to keep from list of colnames
-    
-    Args:
-        columns: list, containing all column names
-
-    Returns:
-        list, containing columns to retain
+    input:
+    all_column_names = list, list of all column names of the dataframe
+    selected_column_names = list, list of column names to select
+    method = string, in what way does the match have to match? 
+    output:
+    keep_columns = list, list containing columns to retain
     """
+    keep_columns = []
 
-    keep_cols = []
-
-    for match in EXACT_MATCHES:
-        keep = [col for col in columns if col == match]
-        keep_cols += keep
-
-    for match in CONTAINS:
-        keep = [col for col in columns if col.startswith(match)] 
-        keep_cols += keep
-    
-    return keep_cols
-
+    for match in selected_column_names:
+        if "exact_matches" == method:
+            keep_column = [column for column in all_column_names if column == match]
+        elif "contains" == method:
+            keep_column = [column for column in all_column_names if column.startswith(match)]
+        else:
+            print(f"In function 'select_columns' the variable name {method} has been passed but isn't a valid method name. Change this to a valid method name")
+            sys.exit()
+        keep_columns += keep_column
+        
+    return keep_columns
 
 def select_proteins(index):
     """
@@ -166,7 +174,8 @@ if __name__ == "__main__":
 
     #get settings
     settings_dict = load_json(args.settings_filename)
+    protein_groups_dataframe = read_in_protein_groups_file(args.filename)
 
-    processed = process_maxquant(args.filename, settings_dict)
+    processed = process_maxquant(protein_groups_dataframe, settings_dict)
     
     # processed.to_csv('processed_out.tsv', sep='\t')
