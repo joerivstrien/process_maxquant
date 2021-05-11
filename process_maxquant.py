@@ -6,32 +6,7 @@ import json
 
 import argparse
 
-### columns whose name matches these strings
-### exactly are kept
-##EXACT_MATCHES = [
-##    # 'Majority protein IDs',
-##    'Number of proteins',
-##    'Razor + unique peptides',
-##    'Fasta headers',
-##    'PEP',
-##    'Intensity',
-##    'Mol. weight [kDa]',
-##    'Sequence length',
-##    'MS/MS Count'
-##    'iBAQ',
-##]
-##
-### columns containing these strings are kept
-##CONTAINS = [
-##    'iBAQ ',
-##]
-##
-### proteins whose name contains one of these
-###  strings it is filtered out
-##PROTEIN_FILTERS = [
-##    'REV',
-##    'CON',
-##]
+
 def load_json(json_filepath):
     """
     input:
@@ -82,46 +57,50 @@ def process_maxquant(protein_groups_dataframe, settings_dict):
     output:
     processed_dataframe = pd.DataFrame()
     """
-    
-    # select columns to keep
     print("Start removing unwanted columns from the dataframe:")
     all_dataframe_columns = list(protein_groups_dataframe.columns)
-    selected_dataframe_columns = select_columns(all_dataframe_columns, settings_dict["EXACT_MATCHES"], "exact_matches")
-    selected_dataframe_columns = select_columns(all_dataframe_columns, settings_dict["CONTAINS"], "contains")
-    
+    selected_dataframe_columns = []
+    for key_word, method in zip(["EXACT_MATCHES", "CONTAINS"], ["exact_matches", "contains"]):
+        selected_columns = select_columns(all_dataframe_columns, settings_dict[key_word], method)
+        selected_dataframe_columns += selected_columns
     protein_groups_dataframe = protein_groups_dataframe[selected_dataframe_columns]
+    
     number_of_rows = protein_groups_dataframe.shape[0]
     number_of_columns = protein_groups_dataframe.shape[1]
-    print(f"Finished removing unwanted columns from the dataframe. The filtered dataframe has {number_of_rows} rows an {number_of_columns} columns")
+    print(f"Finished removing unwanted columns from the dataframe. The filtered dataframe has {number_of_rows} rows and {number_of_columns} columns")
+    print("-"*40)
+    
+    print("Start filtering out unwanted proteins and drop proteins containing NA values: ")
+    filtered_dataframe_rows = select_proteins(protein_groups_dataframe.index, settings_dict["PROTEIN_FILTERS"])
+    protein_groups_dataframe = protein_groups_dataframe.loc[filtered_dataframe_rows]
+    #drop any row containing an NA value:
+    protein_groups_dataframe = protein_groups_dataframe.dropna(axis="index")
+    number_of_rows = protein_groups_dataframe.shape[0]
+    number_of_columns = protein_groups_dataframe.shape[1]
+    print(f"Finished filtering out unwanted proteins. The filtered dataframe has {number_of_rows} rows and {number_of_columns} columns")
     print("-"*40)
 
-    # filter unwanted proteins
-    proteins = select_proteins(data.index)
-    data = data.loc[proteins]
+    print("Start fetching identifiers: ")
+    protein_groups_dataframe['identifier'] = protein_groups_dataframe['Fasta headers'].apply(parse_identifier)
+    print("Finished fetching identifiers. Please see the first 5 rows of the dataframe: ")
+    print(protein_groups_dataframe.head())
 
-    print(data.shape)
+    return protein_groups_dataframe
 
-    data = data.dropna()
-    print(data.shape)
-
-    # fetch id's
-
-    data['identifier'] = data['Fasta headers'].apply(parse_identifier)
-
-    print(data.head())
-
-    return data
-
-def parse_identifier(entry):
+def parse_identifier(fasta_header):
     """
     parse protein identifier from the fasta header
+    input:
+    fasta_header = string
+    output:
+    fasta_identifier = string, a protein identifier encoded into the fasta header
     """
     try:
-        result = entry.split('|')[1]
-    except:
-        print(f'didnt work!: {entry}')
+        fasta_identifier = fasta_header.split('|')[1]
+        return fasta_identifier
+    except Exception as error:
+        print(f'Parsing a fasta header to get the identifier did not work for:\n{entry}')
         return np.nan
-    return result    
 
 def select_columns(all_column_names, selected_column_names, method):
     """
@@ -147,19 +126,18 @@ def select_columns(all_column_names, selected_column_names, method):
         
     return keep_columns
 
-def select_proteins(index):
+def select_proteins(row_labels_index, protein_filters):
     """
-    selects proteins to keep from index
-    
-    Args:
-        dataframe index, list-like    
-    
-    Returns:
-        list of protein identifiers to keep
+    selects proteins to keep using index and protein_filter
+    input:
+    row_labels_index = pd.DataFrame().index, the row labels(in this case 'Majority protein IDs') of the dataframe
+    protein_filters = list, list of filters 
+    output:
+    keep_proteins = list, list with rows to keep
     """
-    keep_proteins = index
-    for protfilt in PROTEIN_FILTERS:
-        keep_proteins = [prot for prot in keep_proteins if protfilt not in prot]
+    keep_proteins = row_labels_index
+    for protein_filter in protein_filters:
+        keep_proteins = [protein for protein in keep_proteins if not protein_filter in protein]
 
     return keep_proteins
 
@@ -176,6 +154,6 @@ if __name__ == "__main__":
     settings_dict = load_json(args.settings_filename)
     protein_groups_dataframe = read_in_protein_groups_file(args.filename)
 
-    processed = process_maxquant(protein_groups_dataframe, settings_dict)
+    processed_dataframe = process_maxquant(protein_groups_dataframe, settings_dict)
     
     # processed.to_csv('processed_out.tsv', sep='\t')
