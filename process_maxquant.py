@@ -5,6 +5,7 @@ import urllib.request
 import time
 import pandas as pd
 import numpy as np
+import re
 
 import json
 
@@ -184,16 +185,15 @@ def fetch_uniprot_annotation(identifiers):
     output:
     protein_data_list = list, list of protein_data_dict
     """
-    #ToDo, tidy up this function and add some print statements telling the user what is happening.
+    #ToDo, add print statements telling the user what is happening. 
     protein_data_list = []
     protein_data_dict = {}
     base_url = "https://www.ebi.ac.uk/proteins/api/proteins?"
-    hyperlink_base_url = "https://www.uniprot.org/uniprot/"
-    base_request_url = "offset=0&size=100&accession="
+    request_base_url = "offset=0&size=100&accession="
     sleep_time = 2
     
     for identifier in identifiers:
-        requestURL = base_url+base_request_url+identifier
+        requestURL = base_url+request_base_url+identifier
         request = requests.get(requestURL, headers={"Accept" : "application/json"})
         if not request.ok:
             print(f"For protein {identifier} something went wrong when getting the uniprot data request. Protein will be ignored")
@@ -201,25 +201,63 @@ def fetch_uniprot_annotation(identifiers):
             protein_data_dict[identifier] = {"gene_name":np.nan, "protein_name":np.nan, "organism_name":np.nan, "hyperlink":np.nan, "cell_compartment":np.nan, "string_linkout":np.nan}
             continue
         else:
-            uniprot_data_dict = request.json()
-            gene_name = uniprot_data_dict[0]["gene"][0]["name"]["value"]
-            protein_name = uniprot_data_dict[0]["protein"]["recommendedName"]["fullName"]["value"]
-            organism_name = uniprot_data_dict[0]["organism"]["names"][0]["value"]
-            hyperlink = hyperlink_base_url+identifier
-            cell_compartment = np.nan
-            string_linkout = get_string_linkout(identifier)
+            gene_name, protein_name, organism_name, hyperlink, cell_compartment, string_linkout = filter_uniprot_query(request.json(), identifier)
             protein_data_dict[identifier] = {"gene_name":gene_name,
                                              "protein_name":protein_name,
                                              "organism_name":organism_name,
                                              "hyperlink":hyperlink,
                                              "cell_compartment":cell_compartment,
                                              "string_linkout":string_linkout}
-        #Let the program sleep for a bit, else uniprot is going to be overloaded and I get a problem. 
+        #Let the program sleep for a bit else uniprot is going to be overloaded and I get a problem. 
         print(protein_data_dict[identifier])
-        break
+        print("-"*40)
     protein_data_list.append(protein_data_dict)
         
     return protein_data_list
+def filter_uniprot_query(uniprot_data_dict, identifier):
+    """
+    input:
+    uniprot_data_dict = [{accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}], this is the best case scenario.
+    fields can be missing.
+    identifier = string
+    output:
+    gene_name = string
+    protein_name = string
+    organism_name = string
+    hyperlink = string
+    cell_compartment = np.nan
+    string_linkout = string
+    """
+    hyperlink_base_url = "https://www.uniprot.org/uniprot/"
+    try:
+        if "gene" in uniprot_data_dict[0].keys():
+            gene_name = uniprot_data_dict[0]["gene"][0]["name"]["value"]
+        else:
+            gene_name = np.nan
+        if "protein" in uniprot_data_dict[0].keys():
+            if "recommendedName" in uniprot_data_dict[0]["protein"].keys(): 
+                protein_name = uniprot_data_dict[0]["protein"]["recommendedName"]["fullName"]["value"]
+            elif "submittedName" in uniprot_data_dict[0]["protein"].keys():
+                protein_name = uniprot_data_dict[0]["protein"]["submittedName"][0]["fullName"]["value"]
+            else:
+                print("Found a protein name which is not recommonededName or submittedName but: "+", ".join(uniprot_data_dict[0]["protein"].keys()))
+                protein_name = uniprot_data_dict[0]["protein"].values()[0]["fullName"]["value"]
+        if "organism" in uniprot_data_dict[0].keys():
+            organism_name = uniprot_data_dict[0]["organism"]["names"][0]["value"]
+        else:
+            organism_name = np.nan
+        hyperlink = hyperlink_base_url+identifier
+        cell_compartment = np.nan
+        string_linkout = get_string_linkout(identifier)
+    except IndexError as index_error:
+        print(f"An index error occured , see below for more information\n{index_error}")
+        print(f"Protein {identifier} uniprot output will be ignored")
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+    except Exception as error:
+        print(f"An error occured while filtering the uniprot query, see below for more information\n{error}")
+        print(f"Protein {identifier} uniprot output will be ignored")
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+    return gene_name, protein_name, organism_name, hyperlink, cell_compartment, string_linkout
 
 def get_string_linkout(identifier):
     """
@@ -231,6 +269,9 @@ def get_string_linkout(identifier):
     """
     base_string_url = "https://string-db.org/network/"
     uniprot_mapping_service_url = 'https://www.uniprot.org/uploadlists/'
+
+    pattern = "\-[0-9]{1}$"
+    if None != re.search(pattern, identifier): identifier = identifier[:-2]
     parameters = {'from': 'ACC+ID', 'to': 'STRING_ID', 'format': 'tab', 'query': identifier}
 
     data = urllib.parse.urlencode(parameters)
@@ -238,7 +279,11 @@ def get_string_linkout(identifier):
     request = urllib.request.Request(uniprot_mapping_service_url, data)
     with urllib.request.urlopen(request) as uniprot_mapping_request:
        response = uniprot_mapping_request.read()
-    string_linkout = base_string_url+response.decode('utf-8')    
+    processed_result = response.decode('utf-8').replace("From\tTo\n", "").strip()
+    if "" == processed_result :
+        string_linkout = np.nan
+    else:
+        string_linkout = base_string_url+processed_result.split("\t")[1]
     return string_linkout
 
 if __name__ == "__main__":
