@@ -178,21 +178,23 @@ def parse_identifier(fasta_header):
         print(f'Parsing a fasta header to get the identifier did not work for:\n{entry}')
         return np.nan
 
-def fetch_uniprot_annotation(identifiers):
+def fetch_uniprot_annotation(identifiers, sleep_time=2):
     """
     input:
     identifiers = pd.Series
     output:
     protein_data_list = list, list of protein_data_dict
     """
-    #ToDo, add print statements telling the user what is happening. 
+    #ToDo, add print statements telling the user what is happening.
+    print(f"Start fetching data from uniprot. After each query {sleep_time} seconds pass before a new protein is queried to uniprot.\nThis safety feature is put in place to prevent being blacklisted.")
+    print("There are {n_identifier} identifiers so fetching data from uniprot will take atleast {total_seconds} seconds.".format(n_identifier=str(len(identifiers)), total_seconds=str(int(sleep_time)*len(identifiers))))
     protein_data_list = []
     protein_data_dict = {}
     base_url = "https://www.ebi.ac.uk/proteins/api/proteins?"
     request_base_url = "offset=0&size=100&accession="
-    sleep_time = 2
     
     for identifier in identifiers:
+        print(f"Start fetching uniprot data for protein {identifier}")
         requestURL = base_url+request_base_url+identifier
         request = requests.get(requestURL, headers={"Accept" : "application/json"})
         if not request.ok:
@@ -201,6 +203,7 @@ def fetch_uniprot_annotation(identifiers):
             protein_data_dict[identifier] = {"gene_name":np.nan, "protein_name":np.nan, "organism_name":np.nan, "hyperlink":np.nan, "cell_compartment":np.nan, "string_linkout":np.nan}
             continue
         else:
+            print(f"Succesfully fetched uniprot data for protein {identifier}:")
             gene_name, protein_name, organism_name, hyperlink, cell_compartment, string_linkout = filter_uniprot_query(request.json(), identifier)
             protein_data_dict[identifier] = {"gene_name":gene_name,
                                              "protein_name":protein_name,
@@ -208,11 +211,13 @@ def fetch_uniprot_annotation(identifiers):
                                              "hyperlink":hyperlink,
                                              "cell_compartment":cell_compartment,
                                              "string_linkout":string_linkout}
-        #Let the program sleep for a bit else uniprot is going to be overloaded and I get a problem. 
+        #Let the program sleep for a bit else uniprot is going to be overloaded and I get a problem.
+        time.sleep(sleep_time)
         print(protein_data_dict[identifier])
         print("-"*40)
     protein_data_list.append(protein_data_dict)
-        
+    print("Finished fetching data from uniprot")
+    
     return protein_data_list
 def filter_uniprot_query(uniprot_data_dict, identifier):
     """
