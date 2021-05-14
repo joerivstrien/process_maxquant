@@ -240,7 +240,7 @@ def filter_uniprot_query(uniprot_data_dict, identifier):
         organism_name = get_organism_name(uniprot_data_dict)
         cell_compartment = get_cell_compartment(uniprot_data_dict)
         string_linkout = get_string_linkout(identifier)
-        second_string_linkout = get_second_string_linkout(uniprot_data_dict)
+        second_string_linkout = get_database_reference_element(uniprot_data_dict, "STRING")#apparently the STRING id is not always found in the maxquant script.
         hyperlink = hyperlink_base_url+identifier
         print(string_linkout, second_string_linkout)
     except IndexError as index_error:
@@ -316,18 +316,20 @@ def get_cell_compartment(uniprot_data_dict):
         cell_compartment = np.nan
     return cell_compartment
 
-def get_second_string_linkout(uniprot_data_dict):
+def get_database_reference_element(uniprot_data_dict, reference_type):
     """
     input:
     uniprot_data_dict = {accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}, this is the best case scenario.
+    reference_type = string
     output:
     string_linkout = string
     """
-    string_linkout = ""
+    element = ""
     if "dbReferences" in uniprot_data_dict.keys():
         for reference in uniprot_data_dict["dbReferences"]:
-            if "STRING" == reference["type"]:
-                string_linkout = reference["id"]
+            if reference_type == reference["type"]:
+                element = reference["id"]
+                return element
     else:
         return np.nan
 
