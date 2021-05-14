@@ -207,6 +207,7 @@ def fetch_uniprot_annotation(identifiers, sleep_time=2, batch_length=100):
         else:
             print(f"Succesfully fetched uniprot data for batch {n_batch}:")
             for request_number, identifier in zip(range(len(request.json())), batch):
+                print(request.json()[request_number])
                 gene_name, protein_name, organism_name, hyperlink, cell_compartment, string_linkout = filter_uniprot_query(request.json()[request_number], identifier)
                 protein_data_dict[identifier] = {"gene_name":gene_name, "protein_name":protein_name, "organism_name":organism_name, "hyperlink":hyperlink, "cell_compartment":cell_compartment, "string_linkout":string_linkout}
                 print(protein_data_dict[identifier])
@@ -234,12 +235,12 @@ def filter_uniprot_query(uniprot_data_dict, identifier):
     """
     hyperlink_base_url = "https://www.uniprot.org/uniprot/"
     try:
-        get_uniprot_gene_name(uniprot_data_dict)
-        get_protein_name(uniprot_data_dict)
-        get_organism_name(uniprot_data_dict)
-        hyperlink = hyperlink_base_url+identifier
-        cell_compartment = np.nan
+        gene_name = get_uniprot_gene_name(uniprot_data_dict)
+        protein_name = get_protein_name(uniprot_data_dict)
+        organism_name = get_organism_name(uniprot_data_dict)
+        cell_compartment = get_cell_compartment(uniprot_data_dict)
         string_linkout = get_string_linkout(identifier)
+        hyperlink = hyperlink_base_url+identifier
     except IndexError as index_error:
         print(f"An index error occured , see below for more information\n{index_error}")
         print(f"Protein {identifier} uniprot output will be ignored")
@@ -292,7 +293,24 @@ def get_organism_name(uniprot_data_dict):
     else:
         organism_name = np.nan
     return organism_name
-
+def get_cell_compartment(uniprot_data_dict):
+    """
+    input:
+    uniprot_data_dict = {accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}, this is the best case scenario.
+    output:
+    cell_compartment=string
+    """
+    cell_compartment = ""
+    if "comments" in uniprot_data_dict.keys():
+        for reference in uniprot_data_dict["comments"]:
+            if "SUBCELLULAR_LOCATION" == reference["type"]:
+                for location in reference["locations"]:
+                    cell_compartment += location["location"]["value"]+";"
+            else:
+                cell_compartment = np.nan
+    else:
+        cell_compartment = np.nan
+    return cell_compartment
 def get_string_linkout(identifier):
     """
     Use the uniprot identifier mapping service to get a linkout to the string database.
