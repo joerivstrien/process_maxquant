@@ -1,15 +1,16 @@
+#Import standard python libraries:
 import sys
 import requests
+import time
+import re
+import json
+import argparse
 import urllib.parse
 import urllib.request
-import time
+#Import third-part libraries
 import pandas as pd
 import numpy as np
-import re
 
-import json
-
-import argparse
 
 def get_user_arguments():
     """
@@ -178,14 +179,13 @@ def parse_identifier(fasta_header):
         print(f'Parsing a fasta header to get the identifier did not work for:\n{entry}')
         return np.nan
 
-def fetch_uniprot_annotation(identifiers, sleep_time=2):
+def fetch_uniprot_annotation(identifiers, sleep_time=2, batch_length=100):
     """
     input:
     identifiers = pd.Series
     output:
     protein_data_list = list, list of protein_data_dict
     """
-    #ToDo, add print statements telling the user what is happening.
     print(f"Start fetching data from uniprot. After each query {sleep_time} seconds pass before a new protein is queried to uniprot.\nThis safety feature is put in place to prevent being blacklisted.")
     print("There are {n_identifier} identifiers so fetching data from uniprot will take atleast {total_seconds} seconds.".format(n_identifier=str(len(identifiers)), total_seconds=str(int(sleep_time)*len(identifiers))))
     protein_data_list = []
@@ -193,29 +193,27 @@ def fetch_uniprot_annotation(identifiers, sleep_time=2):
     base_url = "https://www.ebi.ac.uk/proteins/api/proteins?"
     request_base_url = "offset=0&size=100&accession="
     
-    for identifier_index, identifier in enumerate(identifiers):
-        print(f"Start fetching uniprot data for protein {identifier}, which is the {identifier_index} protein of the total {len(identifiers)}")
-        requestURL = base_url+request_base_url+identifier
+    identifiers = np.split(identifiers, range(batch_length,len(identifiers), batch_length))
+    for n_batch, batch in enumerate(identifiers):
+        print(f"Start fetching uniprot data for batch number {n_batch} of the total {len(identifiers)} batches")
+        requestURL = base_url+request_base_url+",".join(batch)
         request = requests.get(requestURL, headers={"Accept" : "application/json"})
         if not request.ok:
-            print(f"For protein {identifier} something went wrong when getting the uniprot data request. Protein will be ignored")
+            print(f"Something went wrong with batch {n_batch} when getting the uniprot data request. Proteins of this batch will be ignored")
             request.raise_for_status()
-            protein_data_dict[identifier] = {"gene_name":np.nan, "protein_name":np.nan, "organism_name":np.nan, "hyperlink":np.nan, "cell_compartment":np.nan, "string_linkout":np.nan}
+            for identifier in batch:
+                protein_data_dict[identifier] = {"gene_name":np.nan, "protein_name":np.nan, "organism_name":np.nan, "hyperlink":np.nan, "cell_compartment":np.nan, "string_linkout":np.nan}
             continue
         else:
-            print(f"Succesfully fetched uniprot data for protein {identifier}:")
-            gene_name, protein_name, organism_name, hyperlink, cell_compartment, string_linkout = filter_uniprot_query(request.json(), identifier)
-            protein_data_dict[identifier] = {"gene_name":gene_name,
-                                             "protein_name":protein_name,
-                                             "organism_name":organism_name,
-                                             "hyperlink":hyperlink,
-                                             "cell_compartment":cell_compartment,
-                                             "string_linkout":string_linkout}
+            print(f"Succesfully fetched uniprot data for batch {n_batch}:")
+            for request_number, identifier in zip(range(len(request.json())), batch):
+                gene_name, protein_name, organism_name, hyperlink, cell_compartment, string_linkout = filter_uniprot_query(request.json()[request_number], identifier)
+                protein_data_dict[identifier] = {"gene_name":gene_name, "protein_name":protein_name, "organism_name":organism_name, "hyperlink":hyperlink, "cell_compartment":cell_compartment, "string_linkout":string_linkout}
+                print(protein_data_dict[identifier])
+                print("-"*40)
         #Let the program sleep for a bit else uniprot is going to be overloaded and I get a problem.
         time.sleep(sleep_time)
-        print(protein_data_dict[identifier])
-        print("-"*40)
-    protein_data_list.append(protein_data_dict)
+        protein_data_list.append(protein_data_dict)
     print("Finished fetching data from uniprot")
     
     return protein_data_list
@@ -236,20 +234,20 @@ def filter_uniprot_query(uniprot_data_dict, identifier):
     """
     hyperlink_base_url = "https://www.uniprot.org/uniprot/"
     try:
-        if "gene" in uniprot_data_dict[0].keys():
-            gene_name = uniprot_data_dict[0]["gene"][0]["name"]["value"]
+        if "gene" in uniprot_data_dict.keys():
+            gene_name = uniprot_data_dict["gene"][0]["name"]["value"]
         else:
             gene_name = np.nan
-        if "protein" in uniprot_data_dict[0].keys():
-            if "recommendedName" in uniprot_data_dict[0]["protein"].keys(): 
-                protein_name = uniprot_data_dict[0]["protein"]["recommendedName"]["fullName"]["value"]
-            elif "submittedName" in uniprot_data_dict[0]["protein"].keys():
-                protein_name = uniprot_data_dict[0]["protein"]["submittedName"][0]["fullName"]["value"]
+        if "protein" in uniprot_data_dict.keys():
+            if "recommendedName" in uniprot_data_dict["protein"].keys(): 
+                protein_name = uniprot_data_dict["protein"]["recommendedName"]["fullName"]["value"]
+            elif "submittedName" in uniprot_data_dict["protein"].keys():
+                protein_name = uniprot_data_dict["protein"]["submittedName"][0]["fullName"]["value"]
             else:
-                print("Found a protein name which is not recommonededName or submittedName but: "+", ".join(uniprot_data_dict[0]["protein"].keys()))
-                protein_name = uniprot_data_dict[0]["protein"].values()[0]["fullName"]["value"]
-        if "organism" in uniprot_data_dict[0].keys():
-            organism_name = uniprot_data_dict[0]["organism"]["names"][0]["value"]
+                print("Found a protein name which is not recommonededName or submittedName but: "+", ".join(uniprot_data_dict["protein"].keys()))
+                protein_name = uniprot_data_dict["protein"].values()[0]["fullName"]["value"]
+        if "organism" in uniprot_data_dict.keys():
+            organism_name = uniprot_data_dict["organism"]["names"][0]["value"]
         else:
             organism_name = np.nan
         hyperlink = hyperlink_base_url+identifier
@@ -336,13 +334,13 @@ if __name__ == "__main__":
     protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
 
     #fetch annotation for uniprot identifiers:
-    #protein_data_list = fetch_uniprot_annotation(protein_groups_dataframe["identifier"])
+    protein_data_list = fetch_uniprot_annotation(protein_groups_dataframe["identifier"])
     with open("example_proteins_group_data.json", 'r') as inputfile:
         protein_data_list = json.load(inputfile)
     protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_list)
     
     #map proteins to mitocarta:
-
+    
     #apply hierarchical cluster analysis
 
     #write away dataframe to an excel file:
