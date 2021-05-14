@@ -193,8 +193,8 @@ def fetch_uniprot_annotation(identifiers, sleep_time=2):
     base_url = "https://www.ebi.ac.uk/proteins/api/proteins?"
     request_base_url = "offset=0&size=100&accession="
     
-    for identifier in identifiers:
-        print(f"Start fetching uniprot data for protein {identifier}")
+    for identifier_index, identifier in enumerate(identifiers):
+        print(f"Start fetching uniprot data for protein {identifier}, which is the {identifier_index} protein of the total {len(identifiers)}")
         requestURL = base_url+request_base_url+identifier
         request = requests.get(requestURL, headers={"Accept" : "application/json"})
         if not request.ok:
@@ -221,6 +221,7 @@ def fetch_uniprot_annotation(identifiers, sleep_time=2):
     return protein_data_list
 def filter_uniprot_query(uniprot_data_dict, identifier):
     """
+    Because the input has so little certainty this function looks like a mess. In order to be error prone each and every variable needs to be checked if it is present. 
     input:
     uniprot_data_dict = [{accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}], this is the best case scenario.
     fields can be missing.
@@ -290,7 +291,38 @@ def get_string_linkout(identifier):
     else:
         string_linkout = base_string_url+processed_result.split("\t")[1]
     return string_linkout
+def append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_list):
+    """
+    input:
+    protein_groups_dataframe = pd.DataFrame
+    protein_data_list = dict{identifier: {"gene_name":"", "protein_name":"", "organism_name":"", "hyperlink":"", "cell_compartment":np.nan, "string_linkout":""}}
+    output:
+    protein_groups_dataframe = pd.DataFrame
+    """
+    print("Start adding the uniprot columns to the existing dataframe")
+    uniprot_column_names = ["gene_name", "protein_name", "organism_name", "hyperlink", "cell_compartment", "string_linkout"]
+    for uniprot_column_name in uniprot_column_names:
+        uniprot_column_values = get_uniprot_column_values(protein_groups_dataframe["identifier"], uniprot_column_name, protein_data_list)
+        protein_groups_dataframe[uniprot_column_name] = uniprot_column_values
+    print("Finished adding the uniprot columns to the existing dataframe")
+    print("-"*40)
+    return protein_groups_dataframe
 
+def get_uniprot_column_values(identifiers, uniprot_column_name, protein_data_list):
+    """
+    input:
+    identifiers = pd.Series
+    uniprot_column_name = string
+    protein_data_list = list, list of dicts
+    output:
+    uniprot_column_values = list
+    """
+    uniprot_column_values = []
+    for identifier in identifiers:
+        uniprot_column_value = protein_data_list[0][identifier][uniprot_column_name]
+        uniprot_column_values.append(uniprot_column_value)
+    return uniprot_column_values
+    
 if __name__ == "__main__":
     args = get_user_arguments()
 
@@ -304,7 +336,11 @@ if __name__ == "__main__":
     protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
 
     #fetch annotation for uniprot identifiers:
-    protein_data_list = fetch_uniprot_annotation(protein_groups_dataframe["identifier"])
+    #protein_data_list = fetch_uniprot_annotation(protein_groups_dataframe["identifier"])
+    with open("example_proteins_group_data.json", 'r') as inputfile:
+        protein_data_list = json.load(inputfile)
+    protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_list)
+    
     #map proteins to mitocarta:
 
     #apply hierarchical cluster analysis
