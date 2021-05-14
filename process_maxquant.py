@@ -240,7 +240,9 @@ def filter_uniprot_query(uniprot_data_dict, identifier):
         organism_name = get_organism_name(uniprot_data_dict)
         cell_compartment = get_cell_compartment(uniprot_data_dict)
         string_linkout = get_string_linkout(identifier)
+        second_string_linkout = get_second_string_linkout(uniprot_data_dict)
         hyperlink = hyperlink_base_url+identifier
+        print(string_linkout, second_string_linkout)
     except IndexError as index_error:
         print(f"An index error occured , see below for more information\n{index_error}")
         print(f"Protein {identifier} uniprot output will be ignored")
@@ -304,13 +306,31 @@ def get_cell_compartment(uniprot_data_dict):
     if "comments" in uniprot_data_dict.keys():
         for reference in uniprot_data_dict["comments"]:
             if "SUBCELLULAR_LOCATION" == reference["type"]:
+                cell_compartment = ""
                 for location in reference["locations"]:
-                    cell_compartment += location["location"]["value"]+";"
+                    cell_compartment += str(location["location"]["value"])+";"
             else:
-                cell_compartment = np.nan
+                if cell_compartment == "":
+                    cell_compartment = np.nan
     else:
         cell_compartment = np.nan
     return cell_compartment
+
+def get_second_string_linkout(uniprot_data_dict):
+    """
+    input:
+    uniprot_data_dict = {accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}, this is the best case scenario.
+    output:
+    string_linkout = string
+    """
+    string_linkout = ""
+    if "dbReferences" in uniprot_data_dict.keys():
+        for reference in uniprot_data_dict["dbReferences"]:
+            if "STRING" == reference["type"]:
+                string_linkout = reference["id"]
+    else:
+        return np.nan
+
 def get_string_linkout(identifier):
     """
     Use the uniprot identifier mapping service to get a linkout to the string database.
