@@ -234,22 +234,9 @@ def filter_uniprot_query(uniprot_data_dict, identifier):
     """
     hyperlink_base_url = "https://www.uniprot.org/uniprot/"
     try:
-        if "gene" in uniprot_data_dict.keys():
-            gene_name = uniprot_data_dict["gene"][0]["name"]["value"]
-        else:
-            gene_name = np.nan
-        if "protein" in uniprot_data_dict.keys():
-            if "recommendedName" in uniprot_data_dict["protein"].keys(): 
-                protein_name = uniprot_data_dict["protein"]["recommendedName"]["fullName"]["value"]
-            elif "submittedName" in uniprot_data_dict["protein"].keys():
-                protein_name = uniprot_data_dict["protein"]["submittedName"][0]["fullName"]["value"]
-            else:
-                print("Found a protein name which is not recommonededName or submittedName but: "+", ".join(uniprot_data_dict["protein"].keys()))
-                protein_name = uniprot_data_dict["protein"].values()[0]["fullName"]["value"]
-        if "organism" in uniprot_data_dict.keys():
-            organism_name = uniprot_data_dict["organism"]["names"][0]["value"]
-        else:
-            organism_name = np.nan
+        get_uniprot_gene_name(uniprot_data_dict)
+        get_protein_name(uniprot_data_dict)
+        get_organism_name(uniprot_data_dict)
         hyperlink = hyperlink_base_url+identifier
         cell_compartment = np.nan
         string_linkout = get_string_linkout(identifier)
@@ -262,6 +249,49 @@ def filter_uniprot_query(uniprot_data_dict, identifier):
         print(f"Protein {identifier} uniprot output will be ignored")
         return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
     return gene_name, protein_name, organism_name, hyperlink, cell_compartment, string_linkout
+
+def get_uniprot_gene_name(uniprot_data_dict):
+    """
+    input:
+    uniprot_data_dict = [{accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}], this is the best case scenario.
+    output:
+    gene_name = string
+    """
+    if "gene" in uniprot_data_dict.keys():
+        gene_name = uniprot_data_dict["gene"][0]["name"]["value"]
+    else:
+        gene_name = np.nan
+    return gene_name
+
+def get_protein_name(uniprot_data_dict):
+    """
+    input:
+    uniprot_data_dict = [{accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}], this is the best case scenario.
+    output:
+    protein_name = string
+    """
+    if "protein" in uniprot_data_dict.keys():
+        if "recommendedName" in uniprot_data_dict["protein"].keys(): 
+            protein_name = uniprot_data_dict["protein"]["recommendedName"]["fullName"]["value"]
+        elif "submittedName" in uniprot_data_dict["protein"].keys():
+            protein_name = uniprot_data_dict["protein"]["submittedName"][0]["fullName"]["value"]
+        else:
+            print("Found a protein name which is not recommonededName or submittedName but: "+", ".join(uniprot_data_dict["protein"].keys()))
+            protein_name = uniprot_data_dict["protein"].values()[0]["fullName"]["value"]
+    return protein_name
+
+def get_organism_name(uniprot_data_dict):
+    """
+    input:
+    uniprot_data_dict = [{accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}], this is the best case scenario.
+    output:
+    organism_name = string 
+    """
+    if "organism" in uniprot_data_dict.keys():
+        organism_name = uniprot_data_dict["organism"]["names"][0]["value"]
+    else:
+        organism_name = np.nan
+    return organism_name
 
 def get_string_linkout(identifier):
     """
