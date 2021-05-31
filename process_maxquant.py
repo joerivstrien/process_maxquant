@@ -442,16 +442,17 @@ def process_uniprot_mapping_service_output(uniprot_mapped_proteins):
             uniprot_mapped_proteins_dict[uniprot_id] = string_id
     return uniprot_mapped_proteins_dict
 
-def append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_list):
+def append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, uniprot_options_dict):
     """
     input:
     protein_groups_dataframe = pd.DataFrame
-    protein_data_list = dict{identifier: {"gene_name":"", "protein_name":"", "organism_name":"", "hyperlink":"", "cell_compartment":np.nan, "string_linkout":""}}
+    protein_data_dict = dict{identifier: {"gene_name":"", "protein_name":"", "organism_name":"", "hyperlink":"", "cell_compartment":np.nan, "string_linkout":""}}
+    uniprot_options_dict = dict, dictionary containing information about which information is gained from the uniprot server
     output:
     protein_groups_dataframe = pd.DataFrame
     """
     print("Start adding the uniprot columns to the existing dataframe")
-    uniprot_column_names = ["gene_name", "protein_name", "organism_name", "hyperlink", "cell_compartment", "string_linkout"]
+    uniprot_column_names = get_column_names(uniprot_options_dict)
     for uniprot_column_name in uniprot_column_names:
         uniprot_column_values = get_uniprot_column_values(protein_groups_dataframe["identifier"], uniprot_column_name, protein_data_list)
         protein_groups_dataframe[uniprot_column_name] = uniprot_column_values
@@ -459,18 +460,41 @@ def append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_list
     print("-"*40)
     return protein_groups_dataframe
 
-def get_uniprot_column_values(identifiers, uniprot_column_name, protein_data_list):
+def get_column_names(uniprot_options_dict):
+    """
+    input:
+    uniprot_options_dict = dict, dictionary containing information about which information is gained from the uniprot server
+    output:
+    uniprot_column_names = list, list of column names
+    """
+    uniprot_column_names = []
+    for option_name, option_value in uniprot_options_dict.items():
+        if option_name == "get_gene_name" and option_value == True:
+            uniprot_column_names.append("gene_name")
+        if option_name == "get_protein_name" and option_value == True:
+            uniprot_column_names.append("protein_name")
+        if option_name == "get_organism_name" and option_value == True:
+            uniprot_column_names.append("organism_name")
+        if option_name == "get_uniprot_hyperlink" and option_value == True:
+            uniprot_column_names.append("uniprot_hyperlink")
+        if option_name == "get_cell_compartment" and option_value == True:
+            uniprot_column_names.append("cell_compartment")
+        if option_name == "get_string_linkout" and option_value == True:
+            uniprot_column_names.append("string_linkout")
+    return uniprot_column_names
+
+def get_uniprot_column_values(identifiers, uniprot_column_name, protein_data_dict):
     """
     input:
     identifiers = pd.Series
     uniprot_column_name = string
-    protein_data_list = list, list of dicts
+    protein_data_list = dict{identifier: {"gene_name":"", "protein_name":"", "organism_name":"", "hyperlink":"", "cell_compartment":np.nan, "string_linkout":""}}
     output:
     uniprot_column_values = list
     """
     uniprot_column_values = []
     for identifier in identifiers:
-        uniprot_column_value = protein_data_list[0][identifier][uniprot_column_name]
+        uniprot_column_value = protein_data_dict[identifier][uniprot_column_name]
         uniprot_column_values.append(uniprot_column_value)
     return uniprot_column_values
     
@@ -492,10 +516,10 @@ if __name__ == "__main__":
     protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
 
     #fetch annotation for uniprot identifiers:
-    protein_data_list = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
-    with open("example_proteins_group_data.json", 'r') as inputfile:
-        protein_data_list = json.load(inputfile)
-    protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_list)
+    protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
+##    with open("example_proteins_group_data.json", 'r') as inputfile:
+##        protein_data_list = json.load(inputfile)
+    protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
     
     #map proteins to mitocarta:
     
