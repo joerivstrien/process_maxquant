@@ -186,13 +186,15 @@ def fetch_uniprot_annotation(identifiers, sleep_time=2, batch_length=100):
     output:
     protein_data_list = list, list of protein_data_dict
     """
+    #ToDo, revise the string linkout method in such a way that multiple identifiers can be submitted at once. 
     print(f"Start fetching data from uniprot. After each query {sleep_time} seconds pass before a new protein is queried to uniprot.\nThis safety feature is put in place to prevent being blacklisted.")
     print("There are {n_identifier} identifiers so fetching data from uniprot will take atleast {total_seconds} seconds.".format(n_identifier=str(len(identifiers)), total_seconds=str(int(sleep_time)*len(identifiers))))
     protein_data_list = []
     protein_data_dict = {}
     base_url = "https://www.ebi.ac.uk/proteins/api/proteins?"
     request_base_url = "offset=0&size=100&accession="
-    
+
+    #split identifiers into multiple sub arrays of length batch_length:
     identifiers = np.split(identifiers, range(batch_length,len(identifiers), batch_length))
     for n_batch, batch in enumerate(identifiers):
         print(f"Start fetching uniprot data for batch number {n_batch} of the total {len(identifiers)} batches")
@@ -278,6 +280,8 @@ def get_protein_name(uniprot_data_dict):
             protein_name = uniprot_data_dict["protein"]["recommendedName"]["fullName"]["value"]
         elif "submittedName" in uniprot_data_dict["protein"].keys():
             protein_name = uniprot_data_dict["protein"]["submittedName"][0]["fullName"]["value"]
+        elif "alternativeName" in uniprot_data_dict["protein"].keys():
+            protein_name = uniprot_data_dict["protein"]["alternativeName"]["fullName"]["value"]
         else:
             print("Found a protein name which is not recommonededName or submittedName but: "+", ".join(uniprot_data_dict["protein"].keys()))
             protein_name = uniprot_data_dict["protein"].values()[0]["fullName"]["value"]
@@ -341,6 +345,7 @@ def get_string_linkout(identifier):
     output:
     string_linkout = string
     """
+    #{i.split("\t")[0]:i.split("\t")[1] for i in response.decode('utf-8').replace("From\tTo\n", "").split("\n") if not "" == i}
     base_string_url = "https://string-db.org/network/"
     uniprot_mapping_service_url = 'https://www.uniprot.org/uploadlists/'
 
@@ -353,12 +358,29 @@ def get_string_linkout(identifier):
     request = urllib.request.Request(uniprot_mapping_service_url, data)
     with urllib.request.urlopen(request) as uniprot_mapping_request:
        response = uniprot_mapping_request.read()
-    processed_result = response.decode('utf-8').replace("From\tTo\n", "").strip()
-    if "" == processed_result :
+    process_uniprot_mapping_service_output(response.decode('utf-8'))
+    #processed_result = response.decode('utf-8').replace("From\tTo\n", "").strip()
+    if "" == processed_result or None == processed_result:
         string_linkout = np.nan
     else:
         string_linkout = base_string_url+processed_result.split("\t")[1]
     return string_linkout
+def process_uniprot_mapping_service_output(uniprot_mapped_proteins):
+    """
+    This function enables to process more than one mapped identifier from the uniprot mapping service.
+    input:
+    uniprot_mapped_proteins = string, should look like: From\tTo\nuniprot_identifier\tstring_identifier\nuniprot_identifier\tstring_identifier\n
+    output:
+    uniprot_mapped_proteins_dict = dict{uniprot identifier:string identifier}
+    """
+    uniprot_mapped_proteins_dict = {}
+    uniprot_mapped_proteins = uniprot_mapped_proteins.replace("From\tTo\n", "")
+    for comparison in uniprot_mapped_proteins.split("\n"):
+        if not "" == comparison:
+            identifiers = comparison.split("\t")
+            uniprot_mapped_proteins_dict[identifiers[0]] = identifiers[1]
+    return uniprot_mapped_proteins_dict
+
 def append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_list):
     """
     input:
@@ -392,8 +414,12 @@ def get_uniprot_column_values(identifiers, uniprot_column_name, protein_data_lis
     return uniprot_column_values
     
 if __name__ == "__main__":
+    """
+    ToDo
+    1, add boolean values to the second step in order to control the output. 
+    """
     args = get_user_arguments()
-
+    
     #Read in files:
     settings_dict = load_json(args.settings_filename)
     protein_groups_dataframe = read_in_protein_groups_file(args.filename)
