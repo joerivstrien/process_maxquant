@@ -194,7 +194,7 @@ def fetch_uniprot_annotation(identifiers, settings_dict):
     #split identifiers into multiple sub arrays of length batch_length:
     identifier_batches = np.split(identifiers, range(settings_dict["batch_amount"],len(identifiers), settings_dict["batch_amount"]))
     for n_batch, identifiers_batch in enumerate(identifier_batches):
-        print(f"Start fetching uniprot data for batch number {n_batch} of the total {len(identifiers)} batches")
+        print(f"Start fetching uniprot data for batch number {n_batch} of the total {len(identifier_batches)} batches")
         requestURL = settings_dict["uniprot_base_url"]+settings_dict["uniprot_request_url"]+",".join(identifiers_batch)
         request = requests.get(requestURL, headers={"Accept" : "application/json"})
         if not request.ok:
@@ -467,7 +467,7 @@ def append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict
     print("Start adding the uniprot columns to the existing dataframe")
     uniprot_column_names = get_column_names(uniprot_options_dict)
     for uniprot_column_name in uniprot_column_names:
-        uniprot_column_values = get_uniprot_column_values(protein_groups_dataframe["identifier"], uniprot_column_name, protein_data_list)
+        uniprot_column_values = get_uniprot_column_values(protein_groups_dataframe["identifier"], uniprot_column_name, protein_data_dict)
         protein_groups_dataframe[uniprot_column_name] = uniprot_column_values
     print("Finished adding the uniprot columns to the existing dataframe")
     print("-"*40)
@@ -501,7 +501,7 @@ def get_uniprot_column_values(identifiers, uniprot_column_name, protein_data_dic
     input:
     identifiers = pd.Series
     uniprot_column_name = string
-    protein_data_list = dict{identifier: {"gene_name":"", "protein_name":"", "organism_name":"", "hyperlink":"", "cell_compartment":np.nan, "string_linkout":""}}
+    protein_data_list = dict{identifier: {"gene_name":"", "protein_name":"", "organism_name":"", "uniprot_hyperlink":"", "cell_compartment":np.nan, "string_linkout":""}}
     output:
     uniprot_column_values = list
     """
@@ -510,11 +510,20 @@ def get_uniprot_column_values(identifiers, uniprot_column_name, protein_data_dic
         uniprot_column_value = protein_data_dict[identifier][uniprot_column_name]
         uniprot_column_values.append(uniprot_column_value)
     return uniprot_column_values
+def evaluate_uniprot_settings(uniprot_options):
+    """
+    Evaluate whether the user didn't accidentally put all settings to 0 while the step is 1. 
+    input:
+    uniprot_options = dict{"option":boolean}
+    output:
+    boolean
+    """
+    #any() returns True whenever one element is True and False if all elements are False.
+    return any(uniprot_options.values())
     
 if __name__ == "__main__":
     """
     ToDo
-    Go through the fetch_uniprot function and identify problems. 
     
     """
     args = get_user_arguments()
@@ -532,13 +541,13 @@ if __name__ == "__main__":
         print("The proteins will not be filtered")
         print("-"*50)
     #fetch annotation for uniprot identifiers:
-    if settings_dict["steps_dict"]["uniprot_step"] == True:
+    if settings_dict["steps_dict"]["uniprot_step"] == True and evaluate_uniprot_settings(settings_dict["uniprot_step"]["uniprot_options"]) == True:
         protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
 ##        with open("example_proteins_group_data.json", 'r') as inputfile:
-##            protein_data_list = json.load(inputfile)
+##            protein_data_dict = json.load(inputfile)
         protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
     else:
-        print("Uniprot will not be queried for information")
+        print("Uniprot will not be queried for information due to the step being disabled or none of the fields are set to True.")
         print("-"*50)
     #map proteins to mitocarta:
     
