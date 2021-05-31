@@ -251,7 +251,20 @@ def update_protein_data_dict(uniprot_output_list, identifiers, function_dict, pr
             if None == uniprot_data_dict:
                 protein_data_dict[identifier].update({function_name : np.nan})
             else:
-                protein_data_dict[identifier].update({function_name : function(uniprot_data_dict)})
+                try:
+                    protein_data_dict[identifier].update({function_name : function(uniprot_data_dict)})
+                except KeyError as key_error:
+                    print(f"A key error occured for protein {identifier}, the field {function_name} will be ignored for this protein. Please see error message below: ")
+                    print(key_error)
+                    protein_data_dict[identifier].update({function_name : np.nan})
+                except IndexError as index_error:
+                    print(f"A key index occured for protein {identifier}, the field {function_name} will be ignored for this protein. Please see error message below: ")
+                    print(index_error)
+                    protein_data_dict[identifier].update({function_name : np.nan})
+                except Exception as exception:
+                    print(f"A general exception occured for protein {identifier}, the field {function_name} will be ignored for this protein. Please see error message below: ")
+                    print(exception)
+                    protein_data_dict[identifier].update({function_name : np.nan})
     return protein_data_dict
 
 def get_matching_uniprot_query(uniprot_output_list, identifier):
@@ -511,16 +524,22 @@ if __name__ == "__main__":
     protein_groups_dataframe = read_in_protein_groups_file(args.filename)
 
     #process group proteins file by filtering columns and rows:
-    protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict["filtering_step"])
-    protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict["filtering_step"])
-    protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
-
+    if settings_dict["steps_dict"]["filtering_step"] == True:
+        protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict["filtering_step"])
+        protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict["filtering_step"])
+        protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
+    else:
+        print("The proteins will not be filtered")
+        print("-"*50)
     #fetch annotation for uniprot identifiers:
-    protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
-##    with open("example_proteins_group_data.json", 'r') as inputfile:
-##        protein_data_list = json.load(inputfile)
-    protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
-    
+    if settings_dict["steps_dict"]["uniprot_step"] == True:
+        protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
+##        with open("example_proteins_group_data.json", 'r') as inputfile:
+##            protein_data_list = json.load(inputfile)
+        protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
+    else:
+        print("Uniprot will not be queried for information")
+        print("-"*50)
     #map proteins to mitocarta:
     
     #apply hierarchical cluster analysis
