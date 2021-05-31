@@ -186,13 +186,13 @@ def fetch_uniprot_annotation(identifiers, sleep_time=2, batch_length=100):
     output:
     protein_data_list = list, list of protein_data_dict
     """
-    #ToDo, revise the string linkout method in such a way that multiple identifiers can be submitted at once. 
     print(f"Start fetching data from uniprot. After each query {sleep_time} seconds pass before a new protein is queried to uniprot.\nThis safety feature is put in place to prevent being blacklisted.")
     print("There are {n_identifier} identifiers so fetching data from uniprot will take atleast {total_seconds} seconds.".format(n_identifier=str(len(identifiers)), total_seconds=str(int(sleep_time)*len(identifiers))))
-    protein_data_list = []
     protein_data_dict = {}
     base_url = "https://www.ebi.ac.uk/proteins/api/proteins?"
     request_base_url = "offset=0&size=100&accession="
+
+    function_dict = construct_function_dict()
 
     #split identifiers into multiple sub arrays of length batch_length:
     identifiers = np.split(identifiers, range(batch_length,len(identifiers), batch_length))
@@ -208,18 +208,45 @@ def fetch_uniprot_annotation(identifiers, sleep_time=2, batch_length=100):
             continue
         else:
             print(f"Succesfully fetched uniprot data for batch {n_batch}:")
-            for request_number, identifier in zip(range(len(request.json())), batch):
-                print(request.json()[request_number])
-                gene_name, protein_name, organism_name, hyperlink, cell_compartment, string_linkout = filter_uniprot_query(request.json()[request_number], identifier)
-                protein_data_dict[identifier] = {"gene_name":gene_name, "protein_name":protein_name, "organism_name":organism_name, "hyperlink":hyperlink, "cell_compartment":cell_compartment, "string_linkout":string_linkout}
-                print(protein_data_dict[identifier])
-                print("-"*40)
+            protein_data_dict = update_protein_data_dict(request.json(), batch, function_dict, protein_data_dict)
         #Let the program sleep for a bit else uniprot is going to be overloaded and I get a problem.
         time.sleep(sleep_time)
-        protein_data_list.append(protein_data_dict)
+    return protein_data_dict
     print("Finished fetching data from uniprot")
-    
-    return protein_data_list
+
+def construct_function_dict():
+    """
+    input:
+    None
+    output:
+    function_dict = dict{function_name : function}
+    """
+    function_dict = {"gene_name":get_uniprot_gene_name, "protein_name":get_protein_name, "organism_name":get_organism_name, "cell_compartment":get_cell_compartment}
+    return function_dict
+
+def update_protein_data_dict(uniprot_output_dict, identifiers, function_dict, protein_data_dict):
+    """
+    This function is meant to loop over the identifiers and update a dict with values per protein.
+    input:
+    identifiers = list, list of uniprot identifiers
+    function_dict = dict{function_name(string) : function(function)}
+    protein_data_dict = dict{protein : {gene_name, protein_name, organism_name, uniprot_hyperlink, cell_comparment}}
+    output:
+    protein_data_dict = dict{protein : {gene_name, protein_name, organism_name, uniprot_hyperlink, cell_comparment}}
+    """
+    uniprot_base_url = "https://www.uniprot.org/uniprot/"
+    for request_number in range(len(identifiers)):
+        identifier = identifiers[request_number]
+        uniprot_data_dict = uniprot_output_list[request_number]
+        for function_name, function in function_dict.items():
+            if not identifier in protein_data_dict:
+                protein_data_dict[identifier] = {}
+            protein_data_dict[identifier].update({function_name : function(uniprot_data_dict)})
+        #Per protein the uniprot_hyperlink needs to be added separately because, the other functions depend on the uniprot_data_dict while this function depends on the identifier. 
+        protein_data_dict[identifier].update({"uniprot_hyperlink": uniprot_base_url+identifier})
+        print(protein_data_dict[identifier])
+        print("-"*40)
+    return protein_data_dict
 def filter_uniprot_query(uniprot_data_dict, identifier):
     """
     Because the input has so little certainty this function looks like a mess. In order to be error prone each and every variable needs to be checked if it is present. 
@@ -241,8 +268,7 @@ def filter_uniprot_query(uniprot_data_dict, identifier):
         protein_name = get_protein_name(uniprot_data_dict)
         organism_name = get_organism_name(uniprot_data_dict)
         cell_compartment = get_cell_compartment(uniprot_data_dict)
-        string_linkout = get_string_linkout(identifier)
-        second_string_linkout = get_database_reference_element(uniprot_data_dict, "STRING")#apparently the STRING id is not always found in the maxquant script.
+        second_string_linkout = get_database_reference_element(uniprot_data_dict, "STRING")
         hyperlink = hyperlink_base_url+identifier
         print(string_linkout, second_string_linkout)
     except IndexError as index_error:
@@ -299,6 +325,7 @@ def get_organism_name(uniprot_data_dict):
     else:
         organism_name = np.nan
     return organism_name
+
 def get_cell_compartment(uniprot_data_dict):
     """
     input:
@@ -322,6 +349,7 @@ def get_cell_compartment(uniprot_data_dict):
 
 def get_database_reference_element(uniprot_data_dict, reference_type):
     """
+    In the uniprot_data_dict there is a dict with database linkouts. This function enables you to get a specific linkout, mainly used to get a STRING database linkout. 
     input:
     uniprot_data_dict = {accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}, this is the best case scenario.
     reference_type = string
@@ -339,14 +367,12 @@ def get_database_reference_element(uniprot_data_dict, reference_type):
 
 def get_string_linkout(identifiers):
     """
-    Use the uniprot identifier mapping service to get a linkout to the string database.
+    Use the uniprot identifier mapping service to get a linkout to the string database per uniprot identifier.
     input:
     identifiers = list, list of uniprot identifiers
     output:
     string_linkout_dict = dict{identifier : string_linkout}
-    string_linkout = string
     """
-    #{i.split("\t")[0]:i.split("\t")[1] for i in response.decode('utf-8').replace("From\tTo\n", "").split("\n") if not "" == i}
     base_string_url = "https://string-db.org/network/"
     uniprot_mapping_service_url = 'https://www.uniprot.org/uploadlists/'
     string_linkout_dict = {}
@@ -360,7 +386,6 @@ def get_string_linkout(identifiers):
     with urllib.request.urlopen(request) as uniprot_mapping_request:
        response = uniprot_mapping_request.read()
     uniprot_mapped_proteins_dict = process_uniprot_mapping_service_output(response.decode('utf-8'))
-    #processed_result = response.decode('utf-8').replace("From\tTo\n", "").strip()
     for identifier in identifiers:
         if not identifier in uniprot_mapped_proteins_dict.keys():
             string_linkout_dict[identifier] = np.nan
