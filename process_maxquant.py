@@ -186,26 +186,27 @@ def fetch_uniprot_annotation(identifiers, settings_dict):
     output:
     protein_data_list = list, list of protein_data_dict
     """
-    print(f"Start fetching data from uniprot. After each batch {sleep_time} seconds pass before a new barch is queried to uniprot.\nThis safety feature is put in place to prevent being blacklisted.")
+    print("Start fetching data from uniprot. After each batch {sleep_time} seconds pass before a new barch is queried to uniprot.\nThis safety feature is put in place to prevent being blacklisted."
+          .format(sleep_time=settings_dict["request_idle_time"]))
     protein_data_dict = {}
     function_dict = construct_function_dict(settings_dict)
 
     #split identifiers into multiple sub arrays of length batch_length:
     identifier_batches = np.split(identifiers, range(settings_dict["batch_amount"],len(identifiers), settings_dict["batch_amount"]))
-    for n_batch, identifiers in enumerate(identifier_batches):
+    for n_batch, identifiers_batch in enumerate(identifier_batches):
         print(f"Start fetching uniprot data for batch number {n_batch} of the total {len(identifiers)} batches")
-        requestURL = settings_dict["uniprot_base_url"]+settings_dict["uniprot_request_url"]+",".join(identifiers)
+        requestURL = settings_dict["uniprot_base_url"]+settings_dict["uniprot_request_url"]+",".join(identifiers_batch)
         request = requests.get(requestURL, headers={"Accept" : "application/json"})
         if not request.ok:
             print(f"Something went wrong with query {n_batch} while querying the uniprot database. The {len(identifiers)} proteins of this batch will be ignored")
             request.raise_for_status()
-            for identifier in identifiers:
+            for identifier in identifiers_batch:
                 protein_data_dict[identifier] = {"gene_name":np.nan, "protein_name":np.nan, "organism_name":np.nan, "hyperlink":np.nan, "cell_compartment":np.nan, "string_linkout":np.nan}
         else:
             print(f"Succesfully fetched uniprot data for batch {n_batch}:")
-            protein_data_dict = update_protein_data_dict(request.json(), identifiers, function_dict, protein_data_dict, settings_dict)
-            protein_data_dict = add_uniprot_hyperlink(protein_data_dict, settings_dict, identifiers)
-            protein_data_dict = add_string_linkout(protein_data_dict, settings_dict, identifiers)
+            protein_data_dict = update_protein_data_dict(request.json(), identifiers_batch, function_dict, protein_data_dict, settings_dict)
+            protein_data_dict = add_uniprot_hyperlink(protein_data_dict, settings_dict, identifiers_batch)
+            protein_data_dict = add_string_linkout(protein_data_dict, settings_dict, identifiers_batch)
         #Let the program sleep for a bit else uniprot is going to be overloaded and I get a problem.
         time.sleep(settings_dict["request_idle_time"])
     return protein_data_dict
@@ -231,7 +232,7 @@ def construct_function_dict(settings_dict):
             function_dict.update({"cell_compartment":get_cell_compartment})
     return function_dict
 
-def update_protein_data_dict(uniprot_output_dict, identifiers, function_dict, protein_data_dict):
+def update_protein_data_dict(uniprot_output_list, identifiers, function_dict, protein_data_dict, settings_dict):
     """
     This function is meant to loop over the identifiers and update a dict with values per protein.
     input:
@@ -243,14 +244,29 @@ def update_protein_data_dict(uniprot_output_dict, identifiers, function_dict, pr
     """
     for request_number in range(len(identifiers)):
         identifier = identifiers[request_number]
-        uniprot_data_dict = uniprot_output_list[request_number]
+        uniprot_data_dict = get_matching_uniprot_query(uniprot_output_list, identifier)
+        if not identifier in protein_data_dict.keys():
+            protein_data_dict[identifier] = {}
         for function_name, function in function_dict.items():
-            if not identifier in protein_data_dict:
-                protein_data_dict[identifier] = {}
-            protein_data_dict[identifier].update({function_name : function(uniprot_data_dict)})
-        print(protein_data_dict[identifier])
-        print("-"*40)
+            if None == uniprot_data_dict:
+                protein_data_dict[identifier].update({function_name : np.nan})
+            else:
+                protein_data_dict[identifier].update({function_name : function(uniprot_data_dict)})
     return protein_data_dict
+
+def get_matching_uniprot_query(uniprot_output_list, identifier):
+    """
+    input:
+    uniprot_output_list = list, list of uniprot entries
+    identifier = string
+    output:
+    uniprot_data_dict
+    """
+    for uniprot_data_dict in uniprot_output_list:
+        if "accession" in uniprot_data_dict:
+            if uniprot_data_dict["accession"] == identifier:
+                return uniprot_data_dict
+    return None
 
 def add_uniprot_hyperlink(protein_data_dict, settings_dict, identifiers):
     """
@@ -278,7 +294,9 @@ def add_string_linkout(protein_data_dict, settings_dict, identifiers):
     if settings_dict["uniprot_options"]["get_string_linkout"] == True:
         string_linkout_dict = get_string_linkout(identifiers, settings_dict["string_linkout_parameters"])
         for identifier in identifiers:
-            protein_data_dict.update({identifier:string_linkout_dict[identifier]})
+            protein_data_dict[identifier].update({"string_linkout":string_linkout_dict[identifier]})
+            print(protein_data_dict[identifier])
+            print("-"*40)
     return protein_data_dict 
 
 def get_uniprot_gene_name(uniprot_data_dict):
@@ -469,8 +487,8 @@ if __name__ == "__main__":
     protein_groups_dataframe = read_in_protein_groups_file(args.filename)
 
     #process group proteins file by filtering columns and rows:
-    protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict)
-    protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict)
+    protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict["filtering_step"])
+    protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict["filtering_step"])
     protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
 
     #fetch annotation for uniprot identifiers:
