@@ -179,49 +179,56 @@ def parse_identifier(fasta_header):
         print(f'Parsing a fasta header to get the identifier did not work for:\n{entry}')
         return np.nan
 
-def fetch_uniprot_annotation(identifiers, sleep_time=2, batch_length=100):
+def fetch_uniprot_annotation(identifiers, settings_dict):
     """
     input:
     identifiers = pd.Series
     output:
     protein_data_list = list, list of protein_data_dict
     """
-    print(f"Start fetching data from uniprot. After each query {sleep_time} seconds pass before a new protein is queried to uniprot.\nThis safety feature is put in place to prevent being blacklisted.")
-    print("There are {n_identifier} identifiers so fetching data from uniprot will take atleast {total_seconds} seconds.".format(n_identifier=str(len(identifiers)), total_seconds=str(int(sleep_time)*len(identifiers))))
+    print(f"Start fetching data from uniprot. After each batch {sleep_time} seconds pass before a new barch is queried to uniprot.\nThis safety feature is put in place to prevent being blacklisted.")
     protein_data_dict = {}
-    base_url = "https://www.ebi.ac.uk/proteins/api/proteins?"
-    request_base_url = "offset=0&size=100&accession="
-
-    function_dict = construct_function_dict()
+    function_dict = construct_function_dict(settings_dict)
 
     #split identifiers into multiple sub arrays of length batch_length:
-    identifiers = np.split(identifiers, range(batch_length,len(identifiers), batch_length))
-    for n_batch, batch in enumerate(identifiers):
+    identifier_batches = np.split(identifiers, range(settings_dict["batch_amount"],len(identifiers), settings_dict["batch_amount"]))
+    for n_batch, identifiers in enumerate(identifier_batches):
         print(f"Start fetching uniprot data for batch number {n_batch} of the total {len(identifiers)} batches")
-        requestURL = base_url+request_base_url+",".join(batch)
+        requestURL = settings_dict["uniprot_base_url"]+settings_dict["uniprot_request_url"]+",".join(identifiers)
         request = requests.get(requestURL, headers={"Accept" : "application/json"})
         if not request.ok:
-            print(f"Something went wrong with batch {n_batch} when getting the uniprot data request. Proteins of this batch will be ignored")
+            print(f"Something went wrong with query {n_batch} while querying the uniprot database. The {len(identifiers)} proteins of this batch will be ignored")
             request.raise_for_status()
-            for identifier in batch:
+            for identifier in identifiers:
                 protein_data_dict[identifier] = {"gene_name":np.nan, "protein_name":np.nan, "organism_name":np.nan, "hyperlink":np.nan, "cell_compartment":np.nan, "string_linkout":np.nan}
-            continue
         else:
             print(f"Succesfully fetched uniprot data for batch {n_batch}:")
-            protein_data_dict = update_protein_data_dict(request.json(), batch, function_dict, protein_data_dict)
+            protein_data_dict = update_protein_data_dict(request.json(), identifiers, function_dict, protein_data_dict, settings_dict)
+            protein_data_dict = add_uniprot_hyperlink(protein_data_dict, settings_dict, identifiers)
+            protein_data_dict = add_string_linkout(protein_data_dict, settings_dict, identifiers)
         #Let the program sleep for a bit else uniprot is going to be overloaded and I get a problem.
-        time.sleep(sleep_time)
+        time.sleep(settings_dict["request_idle_time"])
     return protein_data_dict
     print("Finished fetching data from uniprot")
 
-def construct_function_dict():
+def construct_function_dict(settings_dict):
     """
+    Based on the user input apply which functions should be used.
     input:
-    None
+    settings_dict = dict, dict containing settings
     output:
     function_dict = dict{function_name : function}
     """
-    function_dict = {"gene_name":get_uniprot_gene_name, "protein_name":get_protein_name, "organism_name":get_organism_name, "cell_compartment":get_cell_compartment}
+    function_dict = {}
+    for function_setting, function_value in settings_dict["uniprot_options"].items():
+        if function_setting == "get_gene_name" and function_value == True:
+            function_dict.update({"gene_name":get_uniprot_gene_name})
+        if function_setting == "get_protein_name" and function_value == True:
+            function_dict.update({"protein_name":get_protein_name})
+        if function_setting == "get_organism_name" and function_value == True:
+            function_dict.update({"organism_name":get_organism_name})
+        if function_setting == "get_cell_compartment" and function_value == True:
+            function_dict.update({"cell_compartment":get_cell_compartment})
     return function_dict
 
 def update_protein_data_dict(uniprot_output_dict, identifiers, function_dict, protein_data_dict):
@@ -230,11 +237,10 @@ def update_protein_data_dict(uniprot_output_dict, identifiers, function_dict, pr
     input:
     identifiers = list, list of uniprot identifiers
     function_dict = dict{function_name(string) : function(function)}
-    protein_data_dict = dict{protein : {gene_name, protein_name, organism_name, uniprot_hyperlink, cell_comparment}}
+    protein_data_dict = dict{protein : {gene_name, protein_name, organism_name, cell_comparment}}
     output:
-    protein_data_dict = dict{protein : {gene_name, protein_name, organism_name, uniprot_hyperlink, cell_comparment}}
+    protein_data_dict = dict{protein : {gene_name, protein_name, organism_name, cell_comparment}}
     """
-    uniprot_base_url = "https://www.uniprot.org/uniprot/"
     for request_number in range(len(identifiers)):
         identifier = identifiers[request_number]
         uniprot_data_dict = uniprot_output_list[request_number]
@@ -242,44 +248,38 @@ def update_protein_data_dict(uniprot_output_dict, identifiers, function_dict, pr
             if not identifier in protein_data_dict:
                 protein_data_dict[identifier] = {}
             protein_data_dict[identifier].update({function_name : function(uniprot_data_dict)})
-        #Per protein the uniprot_hyperlink needs to be added separately because, the other functions depend on the uniprot_data_dict while this function depends on the identifier. 
-        protein_data_dict[identifier].update({"uniprot_hyperlink": uniprot_base_url+identifier})
         print(protein_data_dict[identifier])
         print("-"*40)
     return protein_data_dict
-def filter_uniprot_query(uniprot_data_dict, identifier):
+
+def add_uniprot_hyperlink(protein_data_dict, settings_dict, identifiers):
     """
-    Because the input has so little certainty this function looks like a mess. In order to be error prone each and every variable needs to be checked if it is present. 
     input:
-    uniprot_data_dict = [{accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}], this is the best case scenario.
-    fields can be missing.
-    identifier = string
+    protein_data_dict = dict{identifier : {gene_name, protein_name, organism_name, cell_comparment}}
+    settings_dict = dict, dictionary containing settings
+    identifiers = list, list of strings
     output:
-    gene_name = string
-    protein_name = string
-    organism_name = string
-    hyperlink = string
-    cell_compartment = np.nan
-    string_linkout = string
+    protein_data_dict = dict{identifier : {gene_name, protein_name, organism_name, uniprot_hyperlink, cell_comparment}}
     """
-    hyperlink_base_url = "https://www.uniprot.org/uniprot/"
-    try:
-        gene_name = get_uniprot_gene_name(uniprot_data_dict)
-        protein_name = get_protein_name(uniprot_data_dict)
-        organism_name = get_organism_name(uniprot_data_dict)
-        cell_compartment = get_cell_compartment(uniprot_data_dict)
-        second_string_linkout = get_database_reference_element(uniprot_data_dict, "STRING")
-        hyperlink = hyperlink_base_url+identifier
-        print(string_linkout, second_string_linkout)
-    except IndexError as index_error:
-        print(f"An index error occured , see below for more information\n{index_error}")
-        print(f"Protein {identifier} uniprot output will be ignored")
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
-    except Exception as error:
-        print(f"An error occured while filtering the uniprot query, see below for more information\n{error}")
-        print(f"Protein {identifier} uniprot output will be ignored")
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
-    return gene_name, protein_name, organism_name, hyperlink, cell_compartment, string_linkout
+    if settings_dict["uniprot_options"]["get_uniprot_hyperlink"] == True:
+        for identifier in identifiers:
+            protein_data_dict[identifier].update({"uniprot_hyperlink":settings_dict["uniprot_protein_base_url"]+identifier})
+    return protein_data_dict
+
+def add_string_linkout(protein_data_dict, settings_dict, identifiers):
+    """
+    input:
+    protein_data_dict = dict{identifier : {gene_name, protein_name, organism_name, cell_comparment, uniprot_hyperlink}}
+    settings_dict = dict, dictionary containing settings
+    identifiers = list, list of strings
+    output:
+    protein_data_dict = dict{identifier : {gene_name, protein_name, organism_name, cell_comparment, uniprot_hyperlink, string_linkout}}
+    """
+    if settings_dict["uniprot_options"]["get_string_linkout"] == True:
+        string_linkout_dict = get_string_linkout(identifiers, settings_dict["string_linkout_parameters"])
+        for identifier in identifiers:
+            protein_data_dict.update({identifier:string_linkout_dict[identifier]})
+    return protein_data_dict 
 
 def get_uniprot_gene_name(uniprot_data_dict):
     """
@@ -365,24 +365,23 @@ def get_database_reference_element(uniprot_data_dict, reference_type):
     else:
         return np.nan
 
-def get_string_linkout(identifiers):
+def get_string_linkout(identifiers, settings_dict):
     """
     Use the uniprot identifier mapping service to get a linkout to the string database per uniprot identifier.
     input:
     identifiers = list, list of uniprot identifiers
+    settings_dict = dict, dictionary with the specific parameters for the string linkout. 
     output:
     string_linkout_dict = dict{identifier : string_linkout}
     """
-    base_string_url = "https://string-db.org/network/"
-    uniprot_mapping_service_url = 'https://www.uniprot.org/uploadlists/'
     string_linkout_dict = {}
 
-    formatted_identifier_string = process_uniprot_identifier_input(identifiers)
+    formatted_identifier_string = process_uniprot_identifier_input(identifiers, settings_dict["regex_pattern"])
     parameters = {'from': 'ACC+ID', 'to': 'STRING_ID', 'format': 'tab', 'query': formatted_identifier_string}
 
     data = urllib.parse.urlencode(parameters)
     data = data.encode('utf-8')
-    request = urllib.request.Request(uniprot_mapping_service_url, data)
+    request = urllib.request.Request(settings_dict["uniprot_mapping_service_url"], data)
     with urllib.request.urlopen(request) as uniprot_mapping_request:
        response = uniprot_mapping_request.read()
     uniprot_mapped_proteins_dict = process_uniprot_mapping_service_output(response.decode('utf-8'))
@@ -390,21 +389,22 @@ def get_string_linkout(identifiers):
         if not identifier in uniprot_mapped_proteins_dict.keys():
             string_linkout_dict[identifier] = np.nan
         else:
-            string_linkout_dict[identifier] = base_string_url+uniprot_mapped_proteins_dict[identifier]
+            string_linkout_dict[identifier] = settings_dict["string_base_url"]+uniprot_mapped_proteins_dict[identifier]
     return string_linkout_dict
 
-def process_uniprot_identifier_input(identifiers):
+def process_uniprot_identifier_input(identifiers, regex_pattern):
     """
     input:
     identifiers = list, list of uniprot identifiers
+    regex_pattern = string, pattern that is used to detect "-[0-9]" suffixes behind proteins. 
     output:
     formatted_identifier_string = string, should be "identifier identifier etc."
     """
-    pattern = "\-[0-9]{1}$"
     formatted_identifier_string = ""
     for identifier in identifiers:
         #A regex function is used to identify proteins with for example: "-2" as suffix and removes the suffix.
-        if None != re.search(pattern, identifier): identifier = identifier[:-2]
+        if None != re.search(regex_pattern, identifier): identifier = identifier[:-2]
+        #each identifier must be spaced besides each other according to the example python3 query from: https://www.uniprot.org/help/api_idmapping, accessed at 31-05-2021
         formatted_identifier_string += identifier+" "
     return formatted_identifier_string
     
@@ -459,7 +459,8 @@ def get_uniprot_column_values(identifiers, uniprot_column_name, protein_data_lis
 if __name__ == "__main__":
     """
     ToDo
-    1, add boolean values to the second step in order to control the output. 
+    Go through the fetch_uniprot function and identify problems. 
+    
     """
     args = get_user_arguments()
     
@@ -473,7 +474,7 @@ if __name__ == "__main__":
     protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
 
     #fetch annotation for uniprot identifiers:
-    protein_data_list = fetch_uniprot_annotation(protein_groups_dataframe["identifier"])
+    protein_data_list = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
     with open("example_proteins_group_data.json", 'r') as inputfile:
         protein_data_list = json.load(inputfile)
     protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_list)
