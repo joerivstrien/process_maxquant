@@ -337,34 +337,52 @@ def get_database_reference_element(uniprot_data_dict, reference_type):
     else:
         return np.nan
 
-def get_string_linkout(identifier):
+def get_string_linkout(identifiers):
     """
     Use the uniprot identifier mapping service to get a linkout to the string database.
     input:
-    identifier = string, uniprot identifier
+    identifiers = list, list of uniprot identifiers
     output:
+    string_linkout_dict = dict{identifier : string_linkout}
     string_linkout = string
     """
     #{i.split("\t")[0]:i.split("\t")[1] for i in response.decode('utf-8').replace("From\tTo\n", "").split("\n") if not "" == i}
     base_string_url = "https://string-db.org/network/"
     uniprot_mapping_service_url = 'https://www.uniprot.org/uploadlists/'
+    string_linkout_dict = {}
 
-    pattern = "\-[0-9]{1}$"
-    if None != re.search(pattern, identifier): identifier = identifier[:-2]
-    parameters = {'from': 'ACC+ID', 'to': 'STRING_ID', 'format': 'tab', 'query': identifier}
+    formatted_identifier_string = process_uniprot_identifier_input(identifiers)
+    parameters = {'from': 'ACC+ID', 'to': 'STRING_ID', 'format': 'tab', 'query': formatted_identifier_string}
 
     data = urllib.parse.urlencode(parameters)
     data = data.encode('utf-8')
     request = urllib.request.Request(uniprot_mapping_service_url, data)
     with urllib.request.urlopen(request) as uniprot_mapping_request:
        response = uniprot_mapping_request.read()
-    process_uniprot_mapping_service_output(response.decode('utf-8'))
+    uniprot_mapped_proteins_dict = process_uniprot_mapping_service_output(response.decode('utf-8'))
     #processed_result = response.decode('utf-8').replace("From\tTo\n", "").strip()
-    if "" == processed_result or None == processed_result:
-        string_linkout = np.nan
-    else:
-        string_linkout = base_string_url+processed_result.split("\t")[1]
-    return string_linkout
+    for identifier in identifiers:
+        if not identifier in uniprot_mapped_proteins_dict.keys():
+            string_linkout_dict[identifier] = np.nan
+        else:
+            string_linkout_dict[identifier] = base_string_url+uniprot_mapped_proteins_dict[identifier]
+    return string_linkout_dict
+
+def process_uniprot_identifier_input(identifiers):
+    """
+    input:
+    identifiers = list, list of uniprot identifiers
+    output:
+    formatted_identifier_string = string, should be "identifier identifier etc."
+    """
+    pattern = "\-[0-9]{1}$"
+    formatted_identifier_string = ""
+    for identifier in identifiers:
+        #A regex function is used to identify proteins with for example: "-2" as suffix and removes the suffix.
+        if None != re.search(pattern, identifier): identifier = identifier[:-2]
+        formatted_identifier_string += identifier+" "
+    return formatted_identifier_string
+    
 def process_uniprot_mapping_service_output(uniprot_mapped_proteins):
     """
     This function enables to process more than one mapped identifier from the uniprot mapping service.
@@ -376,9 +394,9 @@ def process_uniprot_mapping_service_output(uniprot_mapped_proteins):
     uniprot_mapped_proteins_dict = {}
     uniprot_mapped_proteins = uniprot_mapped_proteins.replace("From\tTo\n", "")
     for comparison in uniprot_mapped_proteins.split("\n"):
-        if not "" == comparison:
-            identifiers = comparison.split("\t")
-            uniprot_mapped_proteins_dict[identifiers[0]] = identifiers[1]
+        if not "" == comparison or None == comparison:
+            uniprot_id, string_id = comparison.split("\t")
+            uniprot_mapped_proteins_dict[uniprot_id] = string_id
     return uniprot_mapped_proteins_dict
 
 def append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_list):
