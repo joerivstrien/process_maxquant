@@ -10,6 +10,8 @@ import urllib.request
 #Import third-part libraries
 import pandas as pd
 import numpy as np
+import scipy.cluster.hierarchy as sch
+import scipy.spatial.distance as spd
 
 
 def get_user_arguments():
@@ -550,8 +552,6 @@ def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_species_datafram
     mitocarta_species_dataframe["Synonyms"].fillna('', inplace=True)
     #In the mitocarta_mouse_data there are several synonyms which are floats, in order to remove these the following line of code is needed:
     mitocarta_species_dataframe["Synonyms"].where(cond=[True if type(x) == str else False for x in mitocarta_species_dataframe["Synonyms"].str.split("|")], other="-", inplace=True)
-
-    print(set(protein_groups_dataframe["organism_name"]))
     
     organism_rows = protein_groups_dataframe["organism_name"] == species_name
     symbol_rows = protein_groups_dataframe["gene_name"].isin([symbol for symbol in protein_groups_dataframe["gene_name"] if mitocarta_species_dataframe["Symbol"].str.contains(symbol).any() == True
@@ -560,10 +560,31 @@ def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_species_datafram
     presency_index = protein_groups_dataframe.index[(organism_rows) & (symbol_rows)]
     protein_groups_dataframe[new_column_name] = [1.0 if index in presency_index else 0.0 for index in range(protein_groups_dataframe.shape[0])]
     
-    print(set([x for x in protein_groups_dataframe[new_column_name]]))
     print(f"Finished finding proteins found in the {species_name} mitocarta dataset")
     print("-"*40)
     return protein_groups_dataframe
+
+
+def cluster_reorder(sample_specific_dataframe, method = 'average', metric = 'correlation'):
+        """
+        clusters proteins with hierarchical clustering. Determines optimal order, resulting in minimal distance between adjacent leaves
+        Returns: dict with mapping of identifier to position in ordered protein list
+        input:
+        sample_specific_dataframe = pd.DataFrame()
+        method = string
+        metric = string
+        output:
+        order = dict{protein_identifier : ordered_index}
+        clustered = 
+        """
+        condensed_distance_matrix = spd.pdist(np.array(sample_specific_dataframe))
+        
+        clustered = sch.linkage(condensed_distance_matrix, method = method, metric = metric, optimal_ordering = True)
+        dendrogram = sch.dendrogram(clustered,labels = sample_specific_dataframe.index.values, orientation = 'right')
+        ordered_index = sample_specific_dataframe.iloc[dendrogram['leaves'],:].index.values
+        order = {label:ix for ix,label in enumerate(ordered_index)}
+        return order, clustered
+
     
 if __name__ == "__main__":
     """
@@ -588,9 +609,9 @@ if __name__ == "__main__":
         print("-"*50)
     #fetch annotation for uniprot identifiers:
     if settings_dict["steps_dict"]["uniprot_step"] == True and evaluate_uniprot_settings(settings_dict["uniprot_step"]["uniprot_options"]) == True:
-##        protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
-        with open("example_proteins_group_data.json", 'r') as inputfile:
-            protein_data_dict = json.load(inputfile)
+        protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
+##        with open("example_proteins_group_data.json", 'r') as inputfile:
+##            protein_data_dict = json.load(inputfile)
         protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
     else:
         print("Uniprot will not be queried for information due to the step being disabled or none of the fields are set to True.")
@@ -603,11 +624,29 @@ if __name__ == "__main__":
         protein_groups_dataframe = is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_human_dataframe, "Homo sapiens", "mitocarta_human_presency")
         
     else:
-        print("Mitocarta will not be queried for information due to the mitocarta or uniprot step being disabled. Uniprot is needed to get per protein the gene symbol.")
+        if settings_dict["steps_dict"]["mitocarta_step"] == False and settings_dict["steps_dict"]["uniprot_step"] == True:
+            print("The final dataframe will not be enriched with information from mitocarta because the mitocarta step is disabled.")
+        elif settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == False:
+            print("The final dataframe will not be enriched with information from mitocarta because the uniprot step is disabled.\nUniprot is needed to get per protein the gene symbol, the key to find values in uniprot.")
+        elif settings_dict["steps_dict"]["mitocarta_step"] == False and settings_dict["steps_dict"]["uniprot_step"] == False:
+            print("The final dataframe will not be enriched with information from mitocarta because the mitocarta and uniprot steps are disabled")
         print("-"*50)
     
     #apply hierarchical cluster analysis
-
+    #get the different sample names:
+    sample_names = list(set([i[1].split("_")[0] for i in protein_groups_dataframe.columns.str.split(" ") if i[0] == "iBAQ" and len(i) > 1]))
+    for sample_name in sample_names:
+        print(f"Start hierarchical clustering for sample {sample_name}")
+        sample_specific_dataframe = pd.DataFrame(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains(sample_name)]], dtype="float64")
+        order_mapping, clustered = cluster_reorder(sample_specific_dataframe, settings_dict["clustering_step"]["method"], settings_dict["clustering_step"]["metric"])
+        protein_groups_dataframe[f'sample_{sample_name}_clustered'] = pd.Series(order_mapping)
+        print(f"Finished hierarchical clustering for sample {sample_name}")
+        print("-"*40)
+    print("Start hierarchical clustering for all samples") 
+    global_order_mapping, global_clustered = cluster_reorder(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains("iBAQ")]])
+    protein_groups_dataframe['global_clustered'] = pd.Series(global_order_mapping)
+    print("Finished hierarchical clustering for all samples")
+    print("-"*40)
     #write away dataframe to an excel file:
     
 
