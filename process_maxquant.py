@@ -58,7 +58,6 @@ def read_in_protein_groups_file(filename):
         protein_groups_dataframe = pd.read_csv(filename, sep='\t', index_col = "Majority protein IDs", low_memory=False)
         number_of_rows = protein_groups_dataframe.shape[0]
         number_of_columns = protein_groups_dataframe.shape[1]
-        print(protein_groups_dataframe.columns)
     except FileNotFoundError as file_not_found_error:
         print(file_not_found_error)
     except IOError as io_error:
@@ -77,7 +76,7 @@ def read_in_excel_file(filename, sheet_name):
     dataframe = pd.DataFrame()
     """
     print(f"Read in {filename} for sheet {sheet_name}.")
-    dataframe = pd.read_excel(io=filename, sheet_name=sheet_name, index_col=None, na_filter=True)
+    dataframe = pd.read_excel(io=filename, sheet_name=sheet_name, index_col=None, na_filter=False)
     print(f"Succesfully read in\'{filename}\' for sheet {sheet_name} and created a dataframe.")
     print("-"*40)
     return dataframe
@@ -546,16 +545,24 @@ def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_species_datafram
     output:
     protein_groups_dataframe = pd.DataFrame()
     """
-    organism_rows = protein_groups_dataframe["organism_name"] == species_name
-    symbol_rows = protein_groups_dataframe["gene_name"].isin([symbol for symbol in protein_groups_dataframe["gene_name"] if mitocarta_species_dataframe["Symbol"].str.contains(x).any() == True or
-                                                                    [symbol in series_list for series_list in mitocarta_species_dataframe["Synonyms"].str.split("|")]])
+    print(f"Start finding proteins found in the {species_name} mitocarta dataset")
+    protein_groups_dataframe["gene_name"].fillna('', inplace=True)
+    mitocarta_species_dataframe["Synonyms"].fillna('', inplace=True)
+    #In the mitocarta_mouse_data there are several synonyms which are floats, in order to remove these the following line of code is needed:
+    mitocarta_species_dataframe["Synonyms"].where(cond=[True if type(x) == str else False for x in mitocarta_species_dataframe["Synonyms"].str.split("|")], other="-", inplace=True)
 
-    #mouse_symbol_rows = [symbol for symbol in protein_groups_dataframe["gene_name"] if symbol == mitocarta_mouse_dataframe["Symbol"] or symbol in mitocarta_mouse_dataframe["Synonyms"].str.split("|")]
-    presency_index = protein_groups_dataframe.index[(organism_rows) & (symbol_rows)]
+    print(set(protein_groups_dataframe["organism_name"]))
     
-    protein_groups_dataframe.loc[presency_index, new_column_name] = 1
-    protein_groups_dataframe.loc[pd.isna(protein_groups_dataframe[new_column_name]), :] = 0
-    print(protein_groups_dataframe[new_column_name])
+    organism_rows = protein_groups_dataframe["organism_name"] == species_name
+    symbol_rows = protein_groups_dataframe["gene_name"].isin([symbol for symbol in protein_groups_dataframe["gene_name"] if mitocarta_species_dataframe["Symbol"].str.contains(symbol).any() == True
+                                                              or [symbol in series_list for series_list in mitocarta_species_dataframe["Synonyms"].str.split("|")]])
+    
+    presency_index = protein_groups_dataframe.index[(organism_rows) & (symbol_rows)]
+    protein_groups_dataframe[new_column_name] = [1.0 if index in presency_index else 0.0 for index in range(protein_groups_dataframe.shape[0])]
+    
+    print(set([x for x in protein_groups_dataframe[new_column_name]]))
+    print(f"Finished finding proteins found in the {species_name} mitocarta dataset")
+    print("-"*40)
     return protein_groups_dataframe
     
 if __name__ == "__main__":
@@ -591,9 +598,9 @@ if __name__ == "__main__":
     #map proteins to mitocarta:    
     if settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == True:
         mitocarta_mouse_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_mouse_ftp_link"], settings_dict["mitocarta_step"]["mouse_sheet_name"])
-        #mitocarta_human_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_human_ftp_link"], settings_dict["mitocarta_step"]["human_sheet_name"])
+        mitocarta_human_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_human_ftp_link"], settings_dict["mitocarta_step"]["human_sheet_name"])
         protein_groups_dataframe = is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_mouse_dataframe, "Mus musculus", "mitocarta_mouse_presency")
-        #protein_groups_dataframe = is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_human_dataframe, "Homo sapiens", "mitocarta_human_presency")
+        protein_groups_dataframe = is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_human_dataframe, "Homo sapiens", "mitocarta_human_presency")
         
     else:
         print("Mitocarta will not be queried for information due to the mitocarta or uniprot step being disabled. Uniprot is needed to get per protein the gene symbol.")
