@@ -536,29 +536,28 @@ def evaluate_uniprot_settings(uniprot_options):
     #any() returns True whenever one element is True and False if all elements are False.
     return any(uniprot_options.values())
 
-def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_mouse_dataframe, mitocarta_human_dataframe):
+def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_species_dataframe, species_name, new_column_name):
     """
     input:
     protein_groups_dataframe = pd.DataFrame()
-    mitocarta_mouse_dataframe = pd.DataFrame()
-    mitocarta_human_dataframe = pd.DataFrame()
+    mitocarta_species_dataframe = pd.DataFrame()
+    species_name = string
+    new_column_name = string
     output:
     protein_groups_dataframe = pd.DataFrame()
     """
-    mouse_rows = protein_groups_dataframe["organism_name"] == "Mus musculus"
-    mouse_symbol_rows = protein_groups_dataframe[[x for x in protein_groups_dataframe["gene_name"] if x in mitocarta_mouse_dataframe["Synonyms"].str.split("|") or x == mitocarta_mouse_dataframe["Symbol"]]]
+    organism_rows = protein_groups_dataframe["organism_name"] == species_name
+    symbol_rows = protein_groups_dataframe["gene_name"].isin([symbol for symbol in protein_groups_dataframe["gene_name"] if mitocarta_species_dataframe["Symbol"].str.contains(x).any() == True or
+                                                                    [symbol in series_list for series_list in mitocarta_species_dataframe["Synonyms"].str.split("|")]])
+
     #mouse_symbol_rows = [symbol for symbol in protein_groups_dataframe["gene_name"] if symbol == mitocarta_mouse_dataframe["Symbol"] or symbol in mitocarta_mouse_dataframe["Synonyms"].str.split("|")]
-
-    mouse_present_index = protein_groups_dataframe.index[(mouse_rows) & (mouse_symbol_rows)]
-    human_present_index = protein_groups_dataframe.index[(protein_groups_dataframe["organism_name"] == "Homo sapiens") &
-                                                                                         ([symbol for symbol in protein_groups_dataframe["gene_name"] if symbol == mitocarta_mouse_dataframe["Symbol"] or symbol in mitocarta_mouse_dataframe["Synonyms"].str.split("|")])]
-    protein_groups_dataframe.loc[mouse_present_index, "mouse_mitocarta_presency"] = 1
-    protein_groups_dataframe.loc[pd.isna(protein_groups_dataframe["mouse_mitocarta_presency"]), :] = 0
-    protein_groups_dataframe.loc[human_present_index, "human_mitocarta_presency"] = 1
-    protein_groups_dataframe.loc[pd.isna(protein_groups_dataframe["human_mitocarta_presency"]), :] = 0
-
-    for value in protein_groups_dataframe["mouse_mitocarta_presency"]:
-        print(value)
+    presency_index = protein_groups_dataframe.index[(organism_rows) & (symbol_rows)]
+    
+    protein_groups_dataframe.loc[presency_index, new_column_name] = 1
+    protein_groups_dataframe.loc[pd.isna(protein_groups_dataframe[new_column_name]), :] = 0
+    print(protein_groups_dataframe[new_column_name])
+    return protein_groups_dataframe
+    
 if __name__ == "__main__":
     """
     ToDo
@@ -592,8 +591,10 @@ if __name__ == "__main__":
     #map proteins to mitocarta:    
     if settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == True:
         mitocarta_mouse_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_mouse_ftp_link"], settings_dict["mitocarta_step"]["mouse_sheet_name"])
-        mitocarta_human_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_human_ftp_link"], settings_dict["mitocarta_step"]["human_sheet_name"])
-        is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_mouse_dataframe, mitocarta_human_dataframe)
+        #mitocarta_human_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_human_ftp_link"], settings_dict["mitocarta_step"]["human_sheet_name"])
+        protein_groups_dataframe = is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_mouse_dataframe, "Mus musculus", "mitocarta_mouse_presency")
+        #protein_groups_dataframe = is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_human_dataframe, "Homo sapiens", "mitocarta_human_presency")
+        
     else:
         print("Mitocarta will not be queried for information due to the mitocarta or uniprot step being disabled. Uniprot is needed to get per protein the gene symbol.")
         print("-"*50)
