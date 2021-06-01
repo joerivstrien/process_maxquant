@@ -55,9 +55,10 @@ def read_in_protein_groups_file(filename):
     """
     print(f"Read in \'{filename}\'")
     try:
-        protein_groups_dataframe = pd.read_csv(filename, sep='\t', index_col = 'Majority protein IDs', low_memory=False)
+        protein_groups_dataframe = pd.read_csv(filename, sep='\t', index_col = "Majority protein IDs", low_memory=False)
         number_of_rows = protein_groups_dataframe.shape[0]
         number_of_columns = protein_groups_dataframe.shape[1]
+        print(protein_groups_dataframe.columns)
     except FileNotFoundError as file_not_found_error:
         print(file_not_found_error)
     except IOError as io_error:
@@ -68,6 +69,18 @@ def read_in_protein_groups_file(filename):
     print(f"Succesfully read in \'{filename}\' and created a dataframe. The dataframe has {number_of_rows} rows and {number_of_columns} columns")
     print("-"*40)
     return protein_groups_dataframe
+def read_in_excel_file(filename, sheet_name):
+    """
+    input:
+    filename = string
+    output:
+    dataframe = pd.DataFrame()
+    """
+    print(f"Read in {filename} for sheet {sheet_name}.")
+    dataframe = pd.read_excel(io=filename, sheet_name=sheet_name, index_col=None, na_filter=True)
+    print(f"Succesfully read in\'{filename}\' for sheet {sheet_name} and created a dataframe.")
+    print("-"*40)
+    return dataframe
 
 def filter_dataframe_columns(protein_groups_dataframe, settings_dict):
     """
@@ -142,7 +155,8 @@ def select_proteins(row_labels_index, protein_filters):
     row_labels_index = pd.DataFrame().index, the row labels(in this case 'Majority protein IDs') of the dataframe
     protein_filters = list, list of filters 
     output:
-    keep_proteins = list, list with rows to keep
+    non_applying_proteins = list, list with rows not to keep
+    applying_proteins = list, list of rows to keep
     """
     for protein_filter in protein_filters:
         non_applying_proteins = [row for row in row_labels_index if not protein_filter in row]
@@ -471,6 +485,7 @@ def append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict
         protein_groups_dataframe[uniprot_column_name] = uniprot_column_values
     print("Finished adding the uniprot columns to the existing dataframe")
     print("-"*40)
+
     return protein_groups_dataframe
 
 def get_column_names(uniprot_options_dict):
@@ -520,11 +535,34 @@ def evaluate_uniprot_settings(uniprot_options):
     """
     #any() returns True whenever one element is True and False if all elements are False.
     return any(uniprot_options.values())
-    
+
+def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_mouse_dataframe, mitocarta_human_dataframe):
+    """
+    input:
+    protein_groups_dataframe = pd.DataFrame()
+    mitocarta_mouse_dataframe = pd.DataFrame()
+    mitocarta_human_dataframe = pd.DataFrame()
+    output:
+    protein_groups_dataframe = pd.DataFrame()
+    """
+    mouse_rows = protein_groups_dataframe["organism_name"] == "Mus musculus"
+    mouse_symbol_rows = protein_groups_dataframe[[x for x in protein_groups_dataframe["gene_name"] if x in mitocarta_mouse_dataframe["Synonyms"].str.split("|") or x == mitocarta_mouse_dataframe["Symbol"]]]
+    #mouse_symbol_rows = [symbol for symbol in protein_groups_dataframe["gene_name"] if symbol == mitocarta_mouse_dataframe["Symbol"] or symbol in mitocarta_mouse_dataframe["Synonyms"].str.split("|")]
+
+    mouse_present_index = protein_groups_dataframe.index[(mouse_rows) & (mouse_symbol_rows)]
+    human_present_index = protein_groups_dataframe.index[(protein_groups_dataframe["organism_name"] == "Homo sapiens") &
+                                                                                         ([symbol for symbol in protein_groups_dataframe["gene_name"] if symbol == mitocarta_mouse_dataframe["Symbol"] or symbol in mitocarta_mouse_dataframe["Synonyms"].str.split("|")])]
+    protein_groups_dataframe.loc[mouse_present_index, "mouse_mitocarta_presency"] = 1
+    protein_groups_dataframe.loc[pd.isna(protein_groups_dataframe["mouse_mitocarta_presency"]), :] = 0
+    protein_groups_dataframe.loc[human_present_index, "human_mitocarta_presency"] = 1
+    protein_groups_dataframe.loc[pd.isna(protein_groups_dataframe["human_mitocarta_presency"]), :] = 0
+
+    for value in protein_groups_dataframe["mouse_mitocarta_presency"]:
+        print(value)
 if __name__ == "__main__":
     """
     ToDo
-    
+    Check per protein if it is present in the mitocarta files.
     """
     args = get_user_arguments()
     
@@ -537,19 +575,28 @@ if __name__ == "__main__":
         protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict["filtering_step"])
         protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict["filtering_step"])
         protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
+        #Reset the index, through this way new columns can be added to the dataframe 
+        protein_groups_dataframe.reset_index(inplace=True)
     else:
         print("The proteins will not be filtered")
         print("-"*50)
     #fetch annotation for uniprot identifiers:
     if settings_dict["steps_dict"]["uniprot_step"] == True and evaluate_uniprot_settings(settings_dict["uniprot_step"]["uniprot_options"]) == True:
-        protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
-##        with open("example_proteins_group_data.json", 'r') as inputfile:
-##            protein_data_dict = json.load(inputfile)
+##        protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
+        with open("example_proteins_group_data.json", 'r') as inputfile:
+            protein_data_dict = json.load(inputfile)
         protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
     else:
         print("Uniprot will not be queried for information due to the step being disabled or none of the fields are set to True.")
         print("-"*50)
-    #map proteins to mitocarta:
+    #map proteins to mitocarta:    
+    if settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == True:
+        mitocarta_mouse_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_mouse_ftp_link"], settings_dict["mitocarta_step"]["mouse_sheet_name"])
+        mitocarta_human_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_human_ftp_link"], settings_dict["mitocarta_step"]["human_sheet_name"])
+        is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_mouse_dataframe, mitocarta_human_dataframe)
+    else:
+        print("Mitocarta will not be queried for information due to the mitocarta or uniprot step being disabled. Uniprot is needed to get per protein the gene symbol.")
+        print("-"*50)
     
     #apply hierarchical cluster analysis
 
