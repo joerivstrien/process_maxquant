@@ -312,7 +312,7 @@ def add_uniprot_hyperlink(protein_data_dict, settings_dict, identifiers):
     """
     if settings_dict["uniprot_options"]["get_uniprot_hyperlink"] == True:
         for identifier in identifiers:
-            protein_data_dict[identifier].update({"uniprot_hyperlink":settings_dict["uniprot_protein_base_url"]+identifier})
+            protein_data_dict[identifier].update({"uniprot_hyperlink":make_hyperlink(settings_dict["uniprot_protein_base_url"]+identifier)})
     return protein_data_dict
 
 def add_string_linkout(protein_data_dict, settings_dict, identifiers):
@@ -440,7 +440,7 @@ def get_string_linkout(identifiers, settings_dict):
         if not identifier in uniprot_mapped_proteins_dict.keys():
             string_linkout_dict[identifier] = np.nan
         else:
-            string_linkout_dict[identifier] = settings_dict["string_base_url"]+uniprot_mapped_proteins_dict[identifier]
+            string_linkout_dict[identifier] = make_hyperlink(settings_dict["string_base_url"]+uniprot_mapped_proteins_dict[identifier])
     return string_linkout_dict
 
 def process_uniprot_identifier_input(identifiers, regex_pattern):
@@ -605,8 +605,6 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
     workbook = writer.book
 
     complexome_profiling_dataframe, data_dataframe = split_dataframe(protein_groups_dataframe)
-    data_dataframe['uniprot_hyperlink'].transform(lambda x: make_hyperlink(x))
-    data_dataframe['string_linkout'].transform(lambda x: make_hyperlink(x))
     complexome_profiling_dataframe = order_complexome_profiling_dataframe(complexome_profiling_dataframe)
 
     non_selected_dataframe.to_excel(writer, sheet_name = "non selected columns", index=False)
@@ -782,15 +780,14 @@ def fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict):
     else:
         print("Uniprot will not be queried for information due to the step being disabled or none of the fields are set to True.")
         print("-"*50)
-        return
     return protein_groups_dataframe
 
 def is_protein_in_mitocarta_step(settings_dict, protein_groups_dataframe):
     """
     Evaluate per protein if it is found in the mouse or human dataset. 
     input:
-    protein_groups_dataframe = pd.DataFrame()
     settings_dict = dict, dictionary with user defined settings
+    protein_groups_dataframe = pd.DataFrame()
     output:
     protein_groups_dataframe = pd.DataFrame()
     """
@@ -811,8 +808,7 @@ def is_protein_in_mitocarta_step(settings_dict, protein_groups_dataframe):
         elif settings_dict["steps_dict"]["mitocarta_step"] == False and settings_dict["steps_dict"]["uniprot_step"] == False:
             print("The final dataframe will not be enriched with information from mitocarta because the mitocarta and uniprot steps are disabled")
         print("-"*50)
-        return 
-
+        
     return protein_groups_dataframe
 
 def apply_clustering_step(settings_dict, protein_groups_dataframe):
@@ -840,7 +836,8 @@ def apply_clustering_step(settings_dict, protein_groups_dataframe):
         print("-"*40)
     else:
         print("Hierarchical clustering will not be applied for the available clusters because the clustering_step has been disabled")
-        return 
+        print("-"*50)
+        
     return protein_groups_dataframe
 def dump_to_excel_step(protein_groups_dataframe, non_selected_dataframe, settings_dict):
     """
@@ -854,7 +851,7 @@ def dump_to_excel_step(protein_groups_dataframe, non_selected_dataframe, setting
     """
     if settings_dict["steps_dict"]["make_excel_file_step"] == True:
         #read in an example dataframe:
-        protein_groups_dataframe = pd.read_csv("excel_input.csv", sep=',', index_col = None, low_memory=False)
+##        protein_groups_dataframe = pd.read_csv("excel_input.csv", sep=',', index_col = None, low_memory=False)
         dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, settings_dict)
     else:
         print("The data will not be written away to an excel file because the make_excel_file_step has been disabled")
@@ -867,7 +864,6 @@ if __name__ == "__main__":
     """
     args = get_user_arguments()
     
-    #Read in files:
     settings_dict = load_json(args.settings_filename)
     protein_groups_dataframe = read_in_protein_groups_file(args.filename)
 
@@ -875,9 +871,12 @@ if __name__ == "__main__":
     
     protein_groups_dataframe = fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict)
     
-    protein_groups_dataframe = is_protein_in_mitocarta(settings_dict, protein_groups_dataframe)
+    protein_groups_dataframe = is_protein_in_mitocarta_step(settings_dict, protein_groups_dataframe)
     
-    protein_groups_dataframe = apply_clustering(settings_dict, protein_groups_dataframe)
+    protein_groups_dataframe = apply_clustering_step(settings_dict, protein_groups_dataframe)
+    
+    dump_to_excel_step(protein_groups_dataframe, non_selected_dataframe, settings_dict)
+    
 
     #this line of code is usefull for testing purposes
     #protein_groups_dataframe.to_csv("excel_input.csv", sep=",", index=False) 
