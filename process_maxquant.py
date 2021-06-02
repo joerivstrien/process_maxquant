@@ -742,20 +742,17 @@ def apply_cond_format(dataframe,startcol,endcol,writer,worksheet,workbook):
                                                'mid_value' : 95,
                                                'mid_color' : "#FFFF00",
                                                'max_color' : "#FF0000"})
-    
-if __name__ == "__main__":
-    """
-    ToDo
-    each step should be put in a separate file
-    the link should be transformed to something that can be clicked upon.
-    """
-    args = get_user_arguments()
-    
-    #Read in files:
-    settings_dict = load_json(args.settings_filename)
-    protein_groups_dataframe = read_in_protein_groups_file(args.filename)
 
-    #process group proteins file by filtering columns and rows:
+def filter_dataframe_step(protein_groups_dataframe, settings_dict):
+    """
+    process group proteins file by filtering columns and rows:
+    input:
+    protein_groups_dataframe = pd.DataFrame()
+    settings_dict = dict, dictionary with user defined settings
+    output:
+    protein_groups_dataframe = pd.DataFrame()
+    non_selected_dataframe = pd.DataFrame()
+    """
     if settings_dict["steps_dict"]["filtering_step"] == True:
         protein_groups_dataframe, non_selected_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict["filtering_step"])
         protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict["filtering_step"])
@@ -763,18 +760,40 @@ if __name__ == "__main__":
         #Reset the index, through this way new columns can be added to the dataframe 
         protein_groups_dataframe.reset_index(inplace=True)
     else:
-        print("The proteins will not be filtered")
+        print("The main dataframe will not be filtered because the filter step has been disabled")
         print("-"*50)
-    #fetch annotation for uniprot identifiers:
+        return 
+    return protein_groups_dataframe, non_selected_dataframe
+
+def fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict):
+    """
+    fetch annotation for uniprot identifiers:
+    input:
+    protein_groups_dataframe = pd.DataFrame()
+    settings_dict = dict, dictionary with user defined settings
+    output:
+    protein_groups_dataframe = pd.DataFrame()
+    """
     if settings_dict["steps_dict"]["uniprot_step"] == True and evaluate_uniprot_settings(settings_dict["uniprot_step"]["uniprot_options"]) == True:
-##        protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
+##      protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
         with open("example_proteins_group_data.json", 'r') as inputfile:
             protein_data_dict = json.load(inputfile)
         protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
     else:
         print("Uniprot will not be queried for information due to the step being disabled or none of the fields are set to True.")
         print("-"*50)
-    #map proteins to mitocarta:
+        return
+    return protein_groups_dataframe
+
+def is_protein_in_mitocarta_step(settings_dict, protein_groups_dataframe):
+    """
+    Evaluate per protein if it is found in the mouse or human dataset. 
+    input:
+    protein_groups_dataframe = pd.DataFrame()
+    settings_dict = dict, dictionary with user defined settings
+    output:
+    protein_groups_dataframe = pd.DataFrame()
+    """
     if settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == True and \
        settings_dict["uniprot_step"]["uniprot_options"]["get_gene_name"] == True and settings_dict["uniprot_step"]["uniprot_options"]["get_organism_name"] == True:
         mitocarta_mouse_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_mouse_ftp_link"], settings_dict["mitocarta_step"]["mouse_sheet_name"])
@@ -792,9 +811,19 @@ if __name__ == "__main__":
         elif settings_dict["steps_dict"]["mitocarta_step"] == False and settings_dict["steps_dict"]["uniprot_step"] == False:
             print("The final dataframe will not be enriched with information from mitocarta because the mitocarta and uniprot steps are disabled")
         print("-"*50)
-    
-    #apply hierarchical cluster analysis
-    #get the different sample names:
+        return 
+
+    return protein_groups_dataframe
+
+def apply_clustering_step(settings_dict, protein_groups_dataframe):
+    """
+    Apply hierarchical cluster analysis per sample and a global one as well 
+    input:
+    protein_groups_dataframe = pd.DataFrame()
+    settings_dict = dict, dictionary with user defined settings
+    output:
+    protein_groups_dataframe = pd.DataFrame()
+    """
     if settings_dict["steps_dict"]["clustering_step"] == True:
         sample_names = list(set([i[1].split("_")[0] for i in protein_groups_dataframe.columns.str.split(" ") if i[0] == "iBAQ" and len(i) > 1]))
         for sample_name in sample_names:
@@ -811,21 +840,44 @@ if __name__ == "__main__":
         print("-"*40)
     else:
         print("Hierarchical clustering will not be applied for the available clusters because the clustering_step has been disabled")
-
-    #for testing purposes create a csv with the current dataframe:
-    #protein_groups_dataframe.to_csv("excel_input.csv", sep=",", index=False) 
-   
-    #write away dataframe to an excel file:
+        return 
+    return protein_groups_dataframe
+def dump_to_excel_step(protein_groups_dataframe, non_selected_dataframe, settings_dict):
+    """
+    write away dataframe to an excel file:
+    input:
+    protein_groups_dataframe = pd.DataFrame()
+    non_selected_dataframe = pd.DataFrame()
+    settings_dict = dict, dictionary with user defined settings
+    output:
+    None
+    """
     if settings_dict["steps_dict"]["make_excel_file_step"] == True:
         #read in an example dataframe:
         protein_groups_dataframe = pd.read_csv("excel_input.csv", sep=',', index_col = None, low_memory=False)
         dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, settings_dict)
-        
     else:
         print("The data will not be written away to an excel file because the make_excel_file_step has been disabled")
+        return
     
-
-
-
+if __name__ == "__main__":
+    """
+    ToDo
+    each step should be put in a separate function
+    """
+    args = get_user_arguments()
     
-    # processed.to_csv('processed_out.tsv', sep='\t')
+    #Read in files:
+    settings_dict = load_json(args.settings_filename)
+    protein_groups_dataframe = read_in_protein_groups_file(args.filename)
+
+    protein_groups_dataframe, non_selected_dataframe = filter_dataframe_step(protein_groups_dataframe, settings_dict)
+    
+    protein_groups_dataframe = fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict)
+    
+    protein_groups_dataframe = is_protein_in_mitocarta(settings_dict, protein_groups_dataframe)
+    
+    protein_groups_dataframe = apply_clustering(settings_dict, protein_groups_dataframe)
+
+    #this line of code is usefull for testing purposes
+    #protein_groups_dataframe.to_csv("excel_input.csv", sep=",", index=False) 
