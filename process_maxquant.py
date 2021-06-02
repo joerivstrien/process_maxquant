@@ -598,29 +598,36 @@ def dump_data_to_excel(protein_groups_dataframe, settings_dict):
     print("Start writing away the data to file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
     writer = pd.ExcelWriter(settings_dict["make_excel_file_step"]["excel_file_name"], engine='xlsxwriter', mode="w")
     workbook = writer.book
-    
-    
-    if settings_dict["steps_dict"]["clustering_step"] == False:    
-        complexome_profiling_dataframe, data_dataframe = split_dataframe(protein_groups_dataframe)
-        complexome_profiling_dataframe = order_complexome_profiling_dataframe(complexome_profiling_dataframe)
 
-        data_dataframe.to_excel(writer, sheet_name = 'data', index=False)
-        complexome_profiling_dataframe.to_excel(writer, sheet_name= "complexome profiles", index=False)
-        worksheet = writer.sheets['data']
-        worksheet = writer.sheets['complexome profiles']
+    complexome_profiling_dataframe, data_dataframe = split_dataframe(protein_groups_dataframe)
+    data_dataframe['uniprot_hyperlink'].transform(lambda x: make_hyperlink(x))
+    data_dataframe['string_linkout'].transform(lambda x: make_hyperlink(x))
+    complexome_profiling_dataframe = order_complexome_profiling_dataframe(complexome_profiling_dataframe)
 
-        positions = get_sample_positions(complexome_profiling_dataframe.columns.tolist())
-        apply_conditional_formating_per_sample(complexome_profiling_dataframe, positions, writer, worksheet, workbook)
-        
-    else:
-        protein_groups_dataframe.to_excel(writer, sheet_name = 'data', index=False)
-        worksheet = writer.sheets['data']
-        positions = get_sample_positions(protein_groups_dataframe.columns.tolist())
-        apply_conditional_formating_per_sample(protein_groups_dataframe, positions, writer, worksheet, workbook)
+    data_dataframe.to_excel(writer, sheet_name = 'data', index=False)
+    complexome_profiling_dataframe.to_excel(writer, sheet_name= "complexome profiles", index=False)
+    worksheet = writer.sheets['data']
+    worksheet = writer.sheets['complexome profiles']
+    
+    positions = get_sample_positions(complexome_profiling_dataframe.columns.tolist())
+    apply_conditional_formating_per_sample(complexome_profiling_dataframe, positions, writer, worksheet, workbook)
         
     writer.save()
     print("Finished writing away the data to file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
-    
+
+def make_hyperlink(hyperlink):
+    """
+    input:
+    hyperlink = string
+    output:
+    hyperlink = string
+    """
+    if "" != hyperlink and pd.isnull(hyperlink) == False:
+        identifier = hyperlink.split("/")[-1:][0]
+        return f'=HYPERLINK({hyperlink}, {identifier})'
+    else:
+        return ""
+
 def split_dataframe(protein_groups_dataframe):
     """
     Split the dataframe into columns containing complexome profiling information and all the other data
@@ -666,7 +673,7 @@ def order_complexome_profiling_dataframe(complexome_profiling_dataframe):
                 cluster_column = column_value
             else:
                 ordered_columns.append(column_value)
-        ordered_columns.append(cluster_column)
+        if cluster_column != "": ordered_columns.append(cluster_column)
     ordered_columns.extend([x for x in complexome_profiling_dataframe.columns[complexome_profiling_dataframe.columns.str.contains(global_key_word)]])
     complexome_profiling_dataframe = complexome_profiling_dataframe.reindex(columns=ordered_columns)
     return complexome_profiling_dataframe
@@ -734,7 +741,8 @@ def apply_cond_format(dataframe,startcol,endcol,writer,worksheet,workbook):
 if __name__ == "__main__":
     """
     ToDo
-    Check per protein if it is present in the mitocarta files.
+    each step should be put in a separate file
+    the link should be transformed to something that can be clicked upon.
     """
     args = get_user_arguments()
     
@@ -772,6 +780,8 @@ if __name__ == "__main__":
     else:
         if settings_dict["steps_dict"]["mitocarta_step"] == False and settings_dict["steps_dict"]["uniprot_step"] == True:
             print("The final dataframe will not be enriched with information from mitocarta because the mitocarta step is disabled.")
+        elif settings_dict["steps_dict"]["uniprot_step"] == True and settings_dict["uniprot_step"]["uniprot_options"]["get_gene_name"] == False or settings_dict["uniprot_step"]["uniprot_options"]["get_organism_name"] == False:
+            print("Uniprot has been queried but the gene name or the organism name has not been retrieved. Set the organism and gene_name to 1 in order to get the information from mitocarta")
         elif settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == False:
             print("The final dataframe will not be enriched with information from mitocarta because the uniprot step is disabled.\nUniprot is needed to get per protein the gene symbol, the key to find values in uniprot.")
         elif settings_dict["steps_dict"]["mitocarta_step"] == False and settings_dict["steps_dict"]["uniprot_step"] == False:
