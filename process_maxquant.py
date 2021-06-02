@@ -634,19 +634,23 @@ if __name__ == "__main__":
     
     #apply hierarchical cluster analysis
     #get the different sample names:
-    sample_names = list(set([i[1].split("_")[0] for i in protein_groups_dataframe.columns.str.split(" ") if i[0] == "iBAQ" and len(i) > 1]))
-    for sample_name in sample_names:
-        print(f"Start hierarchical clustering for sample {sample_name}")
-        sample_specific_dataframe = pd.DataFrame(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains(sample_name)]], dtype="float64")
-        order_mapping, clustered = cluster_reorder(sample_specific_dataframe, settings_dict["clustering_step"]["method"], settings_dict["clustering_step"]["metric"])
-        protein_groups_dataframe[f'sample_{sample_name}_clustered'] = pd.Series(order_mapping)
-        print(f"Finished hierarchical clustering for sample {sample_name}")
+    if settings_dict["steps_dict"]["clustering_step"] == True"
+        sample_names = list(set([i[1].split("_")[0] for i in protein_groups_dataframe.columns.str.split(" ") if i[0] == "iBAQ" and len(i) > 1]))
+        for sample_name in sample_names:
+            print(f"Start hierarchical clustering for sample {sample_name}")
+            sample_specific_dataframe = pd.DataFrame(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains(sample_name)]], dtype="float64")
+            order_mapping, clustered = cluster_reorder(sample_specific_dataframe, settings_dict["clustering_step"]["method"], settings_dict["clustering_step"]["metric"])
+            protein_groups_dataframe[f'sample_{sample_name}_clustered'] = pd.Series(order_mapping)
+            print(f"Finished hierarchical clustering for sample {sample_name}")
+            print("-"*40)
+        print("Start hierarchical clustering for all samples") 
+        global_order_mapping, global_clustered = cluster_reorder(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains("iBAQ")]])
+        protein_groups_dataframe['global_clustered'] = pd.Series(global_order_mapping)
+        print("Finished hierarchical clustering for all samples")
         print("-"*40)
-    print("Start hierarchical clustering for all samples") 
-    global_order_mapping, global_clustered = cluster_reorder(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains("iBAQ")]])
-    protein_groups_dataframe['global_clustered'] = pd.Series(global_order_mapping)
-    print("Finished hierarchical clustering for all samples")
-    print("-"*40)
+    else:
+        print("Hierarchical clustering will not be applied for the available clusters because the clustering_step has been disabled")
+        
     #write away dataframe to an excel file:
     
 
