@@ -91,20 +91,24 @@ def filter_dataframe_columns(protein_groups_dataframe, settings_dict):
     settings_dict = dict{parameter: [values]}
     output:
     protein_groups_dataframe = pd.DataFrame
+    non_selected_dataframe = pd.DataFrame
     """
     print("Start removing unwanted columns from the dataframe:")
     all_dataframe_columns = list(protein_groups_dataframe.columns)
     selected_dataframe_columns = []
+    non_selected_dataframe_columns = []
     for key_word, method in zip(["EXACT_MATCHES", "CONTAINS"], ["exact_matches", "contains"]):
         selected_columns = select_columns(all_dataframe_columns, settings_dict[key_word], method)
         selected_dataframe_columns += selected_columns
+    non_selected_dataframe_columns = list(set(protein_groups_dataframe.columns).difference(selected_dataframe_columns))
+    non_selected_dataframe = protein_groups_dataframe[non_selected_dataframe_columns]
     protein_groups_dataframe = protein_groups_dataframe[selected_dataframe_columns]
     
     number_of_rows = protein_groups_dataframe.shape[0]
     number_of_columns = protein_groups_dataframe.shape[1]
     print(f"Finished removing unwanted columns from the dataframe. The filtered dataframe has {number_of_rows} rows and {number_of_columns} columns")
     print("-"*40)
-    return protein_groups_dataframe
+    return protein_groups_dataframe, non_selected_dataframe
 
 def select_columns(all_column_names, selected_column_names, method):
     """
@@ -586,11 +590,12 @@ def cluster_reorder(sample_specific_dataframe, method = 'average', metric = 'cor
     order = {label:ix for ix,label in enumerate(ordered_index)}
     return order, clustered
 
-def dump_data_to_excel(protein_groups_dataframe, settings_dict):
+def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, settings_dict):
     """
     The last part of this script, dump the complexome profiling data into an excel file.
     input:
     protein_groups_dataframe = pd.DataFrame()
+    non_selected_dataframe = pd.DataFrame()
     settings_dict = dict, dictionary with parameters for this function
     output:
     None
@@ -604,9 +609,9 @@ def dump_data_to_excel(protein_groups_dataframe, settings_dict):
     data_dataframe['string_linkout'].transform(lambda x: make_hyperlink(x))
     complexome_profiling_dataframe = order_complexome_profiling_dataframe(complexome_profiling_dataframe)
 
+    non_selected_dataframe.to_excel(writer, sheet_name = "non selected columns", index=False)
     data_dataframe.to_excel(writer, sheet_name = 'data', index=False)
     complexome_profiling_dataframe.to_excel(writer, sheet_name= "complexome profiles", index=False)
-    worksheet = writer.sheets['data']
     worksheet = writer.sheets['complexome profiles']
     
     positions = get_sample_positions(complexome_profiling_dataframe.columns.tolist())
@@ -624,7 +629,7 @@ def make_hyperlink(hyperlink):
     """
     if "" != hyperlink and pd.isnull(hyperlink) == False:
         identifier = hyperlink.split("/")[-1:][0]
-        return f'=HYPERLINK({hyperlink}, {identifier})'
+        return f'=HYPERLINK("{hyperlink}", "{identifier}")'
     else:
         return ""
 
@@ -752,7 +757,7 @@ if __name__ == "__main__":
 
     #process group proteins file by filtering columns and rows:
     if settings_dict["steps_dict"]["filtering_step"] == True:
-        protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict["filtering_step"])
+        protein_groups_dataframe, non_selected_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict["filtering_step"])
         protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict["filtering_step"])
         protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
         #Reset the index, through this way new columns can be added to the dataframe 
@@ -814,7 +819,7 @@ if __name__ == "__main__":
     if settings_dict["steps_dict"]["make_excel_file_step"] == True:
         #read in an example dataframe:
         protein_groups_dataframe = pd.read_csv("excel_input.csv", sep=',', index_col = None, low_memory=False)
-        dump_data_to_excel(protein_groups_dataframe, settings_dict)
+        dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, settings_dict)
         
     else:
         print("The data will not be written away to an excel file because the make_excel_file_step has been disabled")
