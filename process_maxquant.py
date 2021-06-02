@@ -26,7 +26,9 @@ def get_user_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("filename", help="Group proteins file name", type=str, default="20190115_HEKwt_and_MICS1ko_proteinGroups.txt")
     parser.add_argument("settings_filename", help="Settings file name", type=str, default="maxquant_settings.json")
-    development_arguments = ["20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "maxquant_settings.json"]
+    #useful for not having to write these out each and every time.
+    development_options = [["20190417_Methanop_DDMfull_BLZ2_proteinGroups.txt", "maxquant_settings.json"], ["20200123_Scer_Daniel_NB40_BY4742_DFM6_DFM9_proteinGroups.txt", "maxquant_settings.json"], ["20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "maxquant_settings.json"]]
+    development_arguments = development_options[1]
 
     args = parser.parse_args(development_arguments)
     return args
@@ -40,14 +42,16 @@ def load_json(json_filepath):
     parameters:
     json_file = IO text object
     """
-    with open(json_filepath) as json_file:
-        try:
+    print(f"Read in the settings")
+    try:
+        with open(json_filepath) as json_file:
             json_object = json.load(json_file)
-        except FileNotFoundError as file_not_found_error:
-            print(file_not_found_error)
-        except Exception as error:
-            print("A unhandled error has occurred while reading {json_file_path}, please see error belows:")
-            print(error)
+    except FileNotFoundError as file_not_found_error:
+        print(file_not_found_error)
+    except Exception as error:
+        print("A unhandled error has occurred while reading {json_file_path}, please see error belows:")
+        print(error)
+    print("Succesfully read in the settings")
     return json_object
 def read_in_protein_groups_file(filename):
     """
@@ -75,11 +79,21 @@ def read_in_excel_file(filename, sheet_name):
     """
     input:
     filename = string
+    sheet_name = string
     output:
     dataframe = pd.DataFrame()
     """
     print(f"Read in {filename} for sheet {sheet_name}.")
-    dataframe = pd.read_excel(io=filename, sheet_name=sheet_name, index_col=None, na_filter=False)
+    try:
+        dataframe = pd.read_excel(io=filename, sheet_name=sheet_name, index_col=None, na_filter=False)
+    except FileNotFoundError as file_not_found_error:
+        print(f"The file \'{filename}\' has not been found at the specified location")
+        print(file_not_found_error)
+        sys.exit()
+    except Exception as error:
+        print(f"Something went wrong while reading in the file \'{filename}\', please see the error below:")
+        print(error)
+        sys.exit()
     print(f"Succesfully read in\'{filename}\' for sheet {sheet_name} and created a dataframe.")
     print("-"*40)
     return dataframe
@@ -99,7 +113,7 @@ def filter_dataframe_columns(protein_groups_dataframe, settings_dict):
     non_selected_dataframe_columns = []
     for key_word, method in zip(["EXACT_MATCHES", "CONTAINS"], ["exact_matches", "contains"]):
         selected_columns = select_columns(all_dataframe_columns, settings_dict[key_word], method)
-        selected_dataframe_columns += selected_columns
+        selected_dataframe_columns.extend(selected_columns)
     non_selected_dataframe_columns = list(set(protein_groups_dataframe.columns).difference(selected_dataframe_columns))
     non_selected_dataframe = protein_groups_dataframe[non_selected_dataframe_columns]
     protein_groups_dataframe = protein_groups_dataframe[selected_dataframe_columns]
@@ -262,8 +276,7 @@ def update_protein_data_dict(uniprot_output_list, identifiers, function_dict, pr
     output:
     protein_data_dict = dict{protein : {gene_name, protein_name, organism_name, cell_comparment}}
     """
-    for request_number in range(len(identifiers)):
-        identifier = identifiers[request_number]
+    for identifier in identifiers:
         uniprot_data_dict = get_matching_uniprot_query(uniprot_output_list, identifier)
         if not identifier in protein_data_dict.keys():
             protein_data_dict[identifier] = {}
@@ -289,6 +302,7 @@ def update_protein_data_dict(uniprot_output_list, identifiers, function_dict, pr
 
 def get_matching_uniprot_query(uniprot_output_list, identifier):
     """
+    Per batch not all proteins are found. This function returns the uniprot data for the given identfier if it is present in the uniprot output.
     input:
     uniprot_output_list = list, list of uniprot entries
     identifier = string
@@ -522,7 +536,7 @@ def get_uniprot_column_values(identifiers, uniprot_column_name, protein_data_dic
     input:
     identifiers = pd.Series
     uniprot_column_name = string
-    protein_data_list = dict{identifier: {"gene_name":"", "protein_name":"", "organism_name":"", "uniprot_hyperlink":"", "cell_compartment":np.nan, "string_linkout":""}}
+    protein_data_dict = dict{identifier: {"gene_name":"", "protein_name":"", "organism_name":"", "uniprot_hyperlink":"", "cell_compartment":np.nan, "string_linkout":""}}
     output:
     uniprot_column_values = list
     """
@@ -754,9 +768,9 @@ def filter_dataframe_step(protein_groups_dataframe, settings_dict):
     if settings_dict["steps_dict"]["filtering_step"] == True:
         protein_groups_dataframe, non_selected_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict["filtering_step"])
         protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict["filtering_step"])
-        protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
         #Reset the index, through this way new columns can be added to the dataframe 
         protein_groups_dataframe.reset_index(inplace=True)
+        protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
     else:
         print("The main dataframe will not be filtered because the filter step has been disabled")
         print("-"*50)
@@ -773,9 +787,9 @@ def fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict):
     protein_groups_dataframe = pd.DataFrame()
     """
     if settings_dict["steps_dict"]["uniprot_step"] == True and evaluate_uniprot_settings(settings_dict["uniprot_step"]["uniprot_options"]) == True:
-##      protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
-        with open("example_proteins_group_data.json", 'r') as inputfile:
-            protein_data_dict = json.load(inputfile)
+        protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
+##        with open("example_proteins_group_data.json", 'r') as inputfile:
+##            protein_data_dict = json.load(inputfile)
         protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
     else:
         print("Uniprot will not be queried for information due to the step being disabled or none of the fields are set to True.")
@@ -822,9 +836,10 @@ def apply_clustering_step(settings_dict, protein_groups_dataframe):
     """
     if settings_dict["steps_dict"]["clustering_step"] == True:
         sample_names = list(set([i[1].split("_")[0] for i in protein_groups_dataframe.columns.str.split(" ") if i[0] == "iBAQ" and len(i) > 1]))
+        print(sample_names)
         for sample_name in sample_names:
             print(f"Start hierarchical clustering for sample {sample_name}")
-            sample_specific_dataframe = pd.DataFrame(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains(sample_name)]], dtype="float64")
+            sample_specific_dataframe = pd.DataFrame(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains(pat=f"iBAQ {sample_name}", regex=True)]], dtype="float64")
             order_mapping, clustered = cluster_reorder(sample_specific_dataframe, settings_dict["clustering_step"]["method"], settings_dict["clustering_step"]["metric"])
             protein_groups_dataframe[f'sample_{sample_name}_clustered'] = pd.Series(order_mapping)
             print(f"Finished hierarchical clustering for sample {sample_name}")
@@ -858,10 +873,6 @@ def dump_to_excel_step(protein_groups_dataframe, non_selected_dataframe, setting
         return
     
 if __name__ == "__main__":
-    """
-    ToDo
-    each step should be put in a separate function
-    """
     args = get_user_arguments()
     
     settings_dict = load_json(args.settings_filename)
