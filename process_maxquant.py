@@ -12,7 +12,8 @@ import pandas as pd
 import numpy as np
 import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as spd
-
+import openpyxl
+import xlsxwriter
 
 def get_user_arguments():
     """
@@ -191,7 +192,7 @@ def parse_identifier(fasta_header):
         fasta_identifier = fasta_header.split('|')[1]
         return fasta_identifier
     except Exception as error:
-        print(f'Parsing a fasta header to get the identifier did not work for:\n{entry}')
+        print(f'Parsing a fasta header to get the identifier did not work for header {fasta_header}')
         return np.nan
 
 def fetch_uniprot_annotation(identifiers, settings_dict):
@@ -566,25 +567,169 @@ def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_species_datafram
 
 
 def cluster_reorder(sample_specific_dataframe, method = 'average', metric = 'correlation'):
-        """
-        clusters proteins with hierarchical clustering. Determines optimal order, resulting in minimal distance between adjacent leaves
-        Returns: dict with mapping of identifier to position in ordered protein list
-        input:
-        sample_specific_dataframe = pd.DataFrame()
-        method = string
-        metric = string
-        output:
-        order = dict{protein_identifier : ordered_index}
-        clustered = 
-        """
-        condensed_distance_matrix = spd.pdist(np.array(sample_specific_dataframe))
-        
-        clustered = sch.linkage(condensed_distance_matrix, method = method, metric = metric, optimal_ordering = True)
-        dendrogram = sch.dendrogram(clustered,labels = sample_specific_dataframe.index.values, orientation = 'right')
-        ordered_index = sample_specific_dataframe.iloc[dendrogram['leaves'],:].index.values
-        order = {label:ix for ix,label in enumerate(ordered_index)}
-        return order, clustered
+    """
+    clusters proteins with hierarchical clustering. Determines optimal order, resulting in minimal distance between adjacent leaves
+    Returns: dict with mapping of identifier to position in ordered protein list
+    input:
+    sample_specific_dataframe = pd.DataFrame()
+    method = string
+    metric = string
+    output:
+    order = dict{protein_identifier : ordered_index}
+    clustered = 
+    """
+    condensed_distance_matrix = spd.pdist(np.array(sample_specific_dataframe))
+    
+    clustered = sch.linkage(condensed_distance_matrix, method = method, metric = metric, optimal_ordering = True)
+    dendrogram = sch.dendrogram(clustered,labels = sample_specific_dataframe.index.values, orientation = 'right')
+    ordered_index = sample_specific_dataframe.iloc[dendrogram['leaves'],:].index.values
+    order = {label:ix for ix,label in enumerate(ordered_index)}
+    return order, clustered
 
+def dump_data_to_excel(protein_groups_dataframe, settings_dict):
+    """
+    The last part of this script, dump the complexome profiling data into an excel file.
+    input:
+    protein_groups_dataframe = pd.DataFrame()
+    settings_dict = dict, dictionary with parameters for this function
+    output:
+    None
+    """
+    print("Start writing away the data to file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
+    writer = pd.ExcelWriter(settings_dict["make_excel_file_step"]["excel_file_name"], engine='xlsxwriter', mode="w")
+    workbook = writer.book
+    
+    
+    if settings_dict["steps_dict"]["clustering_step"] == False:    
+        complexome_profiling_dataframe, data_dataframe = split_dataframe(protein_groups_dataframe)
+        complexome_profiling_dataframe = order_complexome_profiling_dataframe(complexome_profiling_dataframe)
+
+        data_dataframe.to_excel(writer, sheet_name = 'data', index=False)
+        complexome_profiling_dataframe.to_excel(writer, sheet_name= "complexome profiles", index=False)
+        worksheet = writer.sheets['data']
+        worksheet = writer.sheets['complexome profiles']
+
+        positions = get_sample_positions(complexome_profiling_dataframe.columns.tolist())
+        apply_conditional_formating_per_sample(complexome_profiling_dataframe, positions, writer, worksheet, workbook)
+        
+    else:
+        protein_groups_dataframe.to_excel(writer, sheet_name = 'data', index=False)
+        worksheet = writer.sheets['data']
+        positions = get_sample_positions(protein_groups_dataframe.columns.tolist())
+        apply_conditional_formating_per_sample(protein_groups_dataframe, positions, writer, worksheet, workbook)
+        
+    writer.save()
+    print("Finished writing away the data to file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
+    
+def split_dataframe(protein_groups_dataframe):
+    """
+    Split the dataframe into columns containing complexome profiling information and all the other data
+    input:
+    protein_groups_dataframe = pd.DataFrame()
+    output:
+    complexome_profiling_dataframe = pd.DataFrame()
+    data_dataframe = pd.DataFrame()
+    """
+    applying_column_names = []
+    non_applying_column_names = []
+    complexome_profiling_sample_filter = "iBAQ"
+    clustered_sample_filter = "clustered"
+    
+    for column_name in protein_groups_dataframe.columns:
+        if complexome_profiling_sample_filter in column_name:
+            applying_column_names.append(column_name)
+        elif clustered_sample_filter in column_name:
+            applying_column_names.append(column_name)
+        else:
+            non_applying_column_names.append(column_name)
+    complexome_profiling_dataframe = protein_groups_dataframe[applying_column_names]
+    data_dataframe = protein_groups_dataframe[non_applying_column_names]
+    return complexome_profiling_dataframe, data_dataframe
+def order_complexome_profiling_dataframe(complexome_profiling_dataframe):
+    """
+    Order the complexome profiling dataframe so the pattern emerges: sample iBAQ columns - sample clustered column - etc. - global clustered column
+    input:
+    complexome_profiling_dataframe = pd.DataFrame()
+    output:
+    complexome_profiling_dataframe = pd.DataFrame()
+    """
+    ordered_columns = []
+    cluster_column = ""
+    cluster_key_word = "clustered"
+    global_key_word = "global"
+
+    sample_names = list(set([i[1].split("_")[0] for i in complexome_profiling_dataframe.columns.str.split(" ") if i[0] == "iBAQ" and len(i) > 1]))
+    for sample_name in sample_names:
+        sample_specific_columns = protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains(sample_name)]
+        for column_value in sample_specific_columns:
+            if cluster_key_word in column_value:
+                cluster_column = column_value
+            else:
+                ordered_columns.append(column_value)
+        ordered_columns.append(cluster_column)
+    ordered_columns.extend([x for x in complexome_profiling_dataframe.columns[complexome_profiling_dataframe.columns.str.contains(global_key_word)]])
+    complexome_profiling_dataframe = complexome_profiling_dataframe.reindex(columns=ordered_columns)
+    return complexome_profiling_dataframe
+
+def get_sample_positions(column_names):
+    """
+    Per sample, get the start and end column positions
+    input:
+    column_names = pd.Index(), iterable with the column names of the complexome profiling dataframe
+    output:
+    positions = list, [[start_position, stop_position], [start_position, stop_position]]
+    """
+    positions = []
+    start_position = 0
+    end_position = 0
+    for column_name in column_names:
+        if "iBAQ" in column_name:
+            if start_position == 0:
+                start_position = column_names.index(column_name)
+            end_position = column_names.index(column_name)
+        else:
+            if end_position != 0:
+                positions.append([start_position, end_position])
+                start_position, end_position = 0, 0 
+    return positions
+
+def apply_conditional_formating_per_sample(complexome_profiling_dataframe, positions, writer, worksheet, workbook):
+    """
+    Per sample, apply conditional formatting using the positions
+    input:
+    complexome_profiling_dataframe = pd.DataFrame()
+    positions = list, [[start_position, end_position],[start_position, end_position]]
+    writer = pd.ExcelWriter object
+    worksheet = writer.sheets object
+    workbook = writer.book object
+    output:
+    complexome_profiling_dataframe = pd.DataFrame()
+    """
+    for start_position, end_position in positions:
+        worksheet.set_column(start_position,end_position, 0.5)
+        apply_cond_format(complexome_profiling_dataframe,start_position,end_position,writer,worksheet,workbook)
+
+def apply_cond_format(dataframe,startcol,endcol,writer,worksheet,workbook):
+    """
+    Apply conditional formatting to relevant columns
+    input:
+    dataframe = pd.DataFrame()
+    startcol = int
+    endcol = int
+    writer = pd.ExcelWriter
+    worksheet = writer.worksheets
+    workbook = writer.workbook
+    output:
+    None
+    """
+    row_numbers = dataframe.shape[0]
+    worksheet.conditional_format(1,startcol,row_numbers, endcol,
+                                              {'type'      : '3_color_scale',
+                                               'min_color' : "#000000",
+                                               'mid_type'  :  'percentile',
+                                               'mid_value' : 95,
+                                               'mid_color' : "#FFFF00",
+                                               'max_color' : "#FF0000"})
     
 if __name__ == "__main__":
     """
@@ -609,15 +754,16 @@ if __name__ == "__main__":
         print("-"*50)
     #fetch annotation for uniprot identifiers:
     if settings_dict["steps_dict"]["uniprot_step"] == True and evaluate_uniprot_settings(settings_dict["uniprot_step"]["uniprot_options"]) == True:
-        protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
-##        with open("example_proteins_group_data.json", 'r') as inputfile:
-##            protein_data_dict = json.load(inputfile)
+##        protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
+        with open("example_proteins_group_data.json", 'r') as inputfile:
+            protein_data_dict = json.load(inputfile)
         protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
     else:
         print("Uniprot will not be queried for information due to the step being disabled or none of the fields are set to True.")
         print("-"*50)
-    #map proteins to mitocarta:    
-    if settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == True:
+    #map proteins to mitocarta:
+    if settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == True and \
+       settings_dict["uniprot_step"]["uniprot_options"]["get_gene_name"] == True and settings_dict["uniprot_step"]["uniprot_options"]["get_organism_name"] == True:
         mitocarta_mouse_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_mouse_ftp_link"], settings_dict["mitocarta_step"]["mouse_sheet_name"])
         mitocarta_human_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_human_ftp_link"], settings_dict["mitocarta_step"]["human_sheet_name"])
         protein_groups_dataframe = is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_mouse_dataframe, "Mus musculus", "mitocarta_mouse_presency")
@@ -634,7 +780,7 @@ if __name__ == "__main__":
     
     #apply hierarchical cluster analysis
     #get the different sample names:
-    if settings_dict["steps_dict"]["clustering_step"] == True"
+    if settings_dict["steps_dict"]["clustering_step"] == True:
         sample_names = list(set([i[1].split("_")[0] for i in protein_groups_dataframe.columns.str.split(" ") if i[0] == "iBAQ" and len(i) > 1]))
         for sample_name in sample_names:
             print(f"Start hierarchical clustering for sample {sample_name}")
@@ -650,8 +796,18 @@ if __name__ == "__main__":
         print("-"*40)
     else:
         print("Hierarchical clustering will not be applied for the available clusters because the clustering_step has been disabled")
-        
+
+    #for testing purposes create a csv with the current dataframe:
+    #protein_groups_dataframe.to_csv("excel_input.csv", sep=",", index=False) 
+   
     #write away dataframe to an excel file:
+    if settings_dict["steps_dict"]["make_excel_file_step"] == True:
+        #read in an example dataframe:
+        protein_groups_dataframe = pd.read_csv("excel_input.csv", sep=',', index_col = None, low_memory=False)
+        dump_data_to_excel(protein_groups_dataframe, settings_dict)
+        
+    else:
+        print("The data will not be written away to an excel file because the make_excel_file_step has been disabled")
     
 
 
