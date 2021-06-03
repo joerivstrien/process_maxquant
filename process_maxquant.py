@@ -24,11 +24,11 @@ def get_user_arguments():
     args = argparse object
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("filename", help="Group proteins file name", type=str, default="20190115_HEKwt_and_MICS1ko_proteinGroups.txt")
+    parser.add_argument("filename", help="Group proteins file name", type=str)
     parser.add_argument("settings_filename", help="Settings file name", type=str, default="maxquant_settings.json")
     #useful for not having to write these out each and every time.
     development_options = [["20190417_Methanop_DDMfull_BLZ2_proteinGroups.txt", "maxquant_settings.json"], ["20200123_Scer_Daniel_NB40_BY4742_DFM6_DFM9_proteinGroups.txt", "maxquant_settings.json"], ["20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "maxquant_settings.json"]]
-    development_arguments = development_options[1]
+    development_arguments = development_options[2]
 
     args = parser.parse_args(development_arguments)
     return args
@@ -571,14 +571,23 @@ def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_species_datafram
     mitocarta_species_dataframe["Synonyms"].fillna('', inplace=True)
     #In the mitocarta_mouse_data there are several synonyms which are floats, in order to remove these the following line of code is needed:
     mitocarta_species_dataframe["Synonyms"].where(cond=[True if type(x) == str else False for x in mitocarta_species_dataframe["Synonyms"].str.split("|")], other="-", inplace=True)
-    
-    organism_rows = protein_groups_dataframe["organism_name"] == species_name
-    symbol_rows = protein_groups_dataframe["gene_name"].isin([symbol for symbol in protein_groups_dataframe["gene_name"] if mitocarta_species_dataframe["Symbol"].str.contains(symbol).any() == True
-                                                              or [symbol in series_list for series_list in mitocarta_species_dataframe["Synonyms"].str.split("|")]])
-    
-    presency_index = protein_groups_dataframe.index[(organism_rows) & (symbol_rows)]
-    protein_groups_dataframe[new_column_name] = [1.0 if index in presency_index else 0.0 for index in range(protein_groups_dataframe.shape[0])]
-    
+
+    try:
+        organism_rows = protein_groups_dataframe["organism_name"] == species_name
+        symbol_rows = protein_groups_dataframe["gene_name"].isin([symbol for symbol in protein_groups_dataframe["gene_name"] if mitocarta_species_dataframe["Symbol"].str.contains(symbol).any() == True
+                                                                  or [symbol in series_list for series_list in mitocarta_species_dataframe["Synonyms"].str.split("|")]])
+        
+        presency_index = protein_groups_dataframe.index[(organism_rows) & (symbol_rows)]
+        protein_groups_dataframe[new_column_name] = [1.0 if index in presency_index else 0.0 for index in range(protein_groups_dataframe.shape[0])]
+    except IndexError as index_error:
+        print(f"An index error occured while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored, please see the error below: ")
+        print(index_error)
+    except ValueError as value_error:
+        print(f"An value error occured while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored, please see the error below: ")
+        print(value_error)
+    except Exception as error:
+        print(f"An exception occured while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored, please see the error below: ")
+        print(error)
     print(f"Finished finding proteins found in the {species_name} mitocarta dataset")
     print("-"*40)
     return protein_groups_dataframe
