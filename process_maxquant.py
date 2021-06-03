@@ -595,22 +595,27 @@ def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_species_datafram
 
 def cluster_reorder(sample_specific_dataframe, method = 'average', metric = 'correlation'):
     """
-    clusters proteins with hierarchical clustering. Determines optimal order, resulting in minimal distance between adjacent leaves
-    Returns: dict with mapping of identifier to position in ordered protein list
+    The complexome profiling data is transformed to a condensed distance matrix and the proteins are clustered using hierarchical clustering. 
+    The optimal order is determined resulting in minimal distance between adjacent leaves. 
     input:
     sample_specific_dataframe = pd.DataFrame()
     method = string
     metric = string
     output:
     order = dict{protein_identifier : ordered_index}
-    clustered = 
+    clustered = np.array(), encoded as linkage matrix 
     """
-    condensed_distance_matrix = spd.pdist(np.array(sample_specific_dataframe))
-    
-    clustered = sch.linkage(condensed_distance_matrix, method = method, metric = metric, optimal_ordering = True)
-    dendrogram = sch.dendrogram(clustered,labels = sample_specific_dataframe.index.values, orientation = 'right')
-    ordered_index = sample_specific_dataframe.iloc[dendrogram['leaves'],:].index.values
-    order = {label:ix for ix,label in enumerate(ordered_index)}
+    try:
+        condensed_distance_matrix = spd.pdist(np.array(sample_specific_dataframe))
+
+        clustered = sch.linkage(condensed_distance_matrix, method = method, metric = metric, optimal_ordering = True)
+        dendrogram = sch.dendrogram(clustered,labels = sample_specific_dataframe.index.values, orientation = 'right')
+        ordered_index = sample_specific_dataframe.iloc[dendrogram['leaves'],:].index.values
+        order = {label:ix for ix,label in enumerate(ordered_index)}
+    except Exception as error:
+        print("An exception occured while applying clustering on a sample. Please see the error below: ")
+        print(error)
+        return {}, np.array()
     return order, clustered
 
 def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, settings_dict):
