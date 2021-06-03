@@ -629,6 +629,7 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
     None
     """
     print("Start writing away the data to file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
+    try:
     writer = pd.ExcelWriter(settings_dict["make_excel_file_step"]["excel_file_name"], engine='xlsxwriter', mode="w")
     workbook = writer.book
 
@@ -640,7 +641,12 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
     
     positions = get_sample_positions(protein_groups_dataframe.columns.tolist())
     apply_conditional_formating_per_sample(protein_groups_dataframe, positions, writer, worksheet, workbook)
-        
+    except Exception as error:
+        print("An error occured while trying to write away the data.\nPlease see the error below:")
+        print(error)
+        print("Now what? The main dataframe without the filtered away columns will be written to an .csv file.")
+        protein_groups_dataframe.to_csv("maxquant_saved_result.csv", sep=",", index=False)
+        print("Succusfully written away the main dataframe to a csv")
     writer.save()
     print("Finished writing away the data to file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
 
@@ -679,6 +685,7 @@ def order_complexome_profiling_dataframe(complexome_profiling_dataframe):
             else:
                 ordered_columns.append(column_value)
         if cluster_column != "": ordered_columns.append(cluster_column)
+    #add global clustering columns to the end of the ordered_columns list:
     ordered_columns.extend([x for x in complexome_profiling_dataframe.columns[complexome_profiling_dataframe.columns.str.contains(global_key_word)]])
     for column in complexome_profiling_dataframe.columns:
         if not column in ordered_columns:
@@ -873,9 +880,6 @@ if __name__ == "__main__":
     
     protein_groups_dataframe = is_protein_in_mitocarta_step(settings_dict, protein_groups_dataframe)
     
-    protein_groups_dataframe = apply_clustering_step(settings_dict, protein_groups_dataframe)
-
-    #this line of code is usefull for testing purposes
-    #protein_groups_dataframe.to_csv("excel_input.csv", sep=",", index=False) 
+    protein_groups_dataframe = apply_clustering_step(settings_dict, protein_groups_dataframe) 
     
     dump_to_excel_step(protein_groups_dataframe, non_selected_dataframe, settings_dict)
