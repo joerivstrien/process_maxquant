@@ -632,16 +632,14 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
     writer = pd.ExcelWriter(settings_dict["make_excel_file_step"]["excel_file_name"], engine='xlsxwriter', mode="w")
     workbook = writer.book
 
-    complexome_profiling_dataframe, data_dataframe = split_dataframe(protein_groups_dataframe)
-    complexome_profiling_dataframe = order_complexome_profiling_dataframe(complexome_profiling_dataframe)
+    protein_groups_dataframe = order_complexome_profiling_dataframe(protein_groups_dataframe)
 
     non_selected_dataframe.to_excel(writer, sheet_name = "non selected columns", index=False)
-    data_dataframe.to_excel(writer, sheet_name = 'data', index=False)
-    complexome_profiling_dataframe.to_excel(writer, sheet_name= "complexome profiles", index=False)
-    worksheet = writer.sheets['complexome profiles']
+    protein_groups_dataframe.to_excel(writer, sheet_name = 'data', index=False)
+    worksheet = writer.sheets['data']
     
-    positions = get_sample_positions(complexome_profiling_dataframe.columns.tolist())
-    apply_conditional_formating_per_sample(complexome_profiling_dataframe, positions, writer, worksheet, workbook)
+    positions = get_sample_positions(protein_groups_dataframe.columns.tolist())
+    apply_conditional_formating_per_sample(protein_groups_dataframe, positions, writer, worksheet, workbook)
         
     writer.save()
     print("Finished writing away the data to file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
@@ -659,30 +657,6 @@ def make_hyperlink(hyperlink):
     else:
         return ""
 
-def split_dataframe(protein_groups_dataframe):
-    """
-    Split the dataframe into columns containing complexome profiling information and all the other data
-    input:
-    protein_groups_dataframe = pd.DataFrame()
-    output:
-    complexome_profiling_dataframe = pd.DataFrame()
-    data_dataframe = pd.DataFrame()
-    """
-    applying_column_names = []
-    non_applying_column_names = []
-    complexome_profiling_sample_filter = "iBAQ"
-    clustered_sample_filter = "clustered"
-    
-    for column_name in protein_groups_dataframe.columns:
-        if complexome_profiling_sample_filter in column_name:
-            applying_column_names.append(column_name)
-        elif clustered_sample_filter in column_name:
-            applying_column_names.append(column_name)
-        else:
-            non_applying_column_names.append(column_name)
-    complexome_profiling_dataframe = protein_groups_dataframe[applying_column_names]
-    data_dataframe = protein_groups_dataframe[non_applying_column_names]
-    return complexome_profiling_dataframe, data_dataframe
 def order_complexome_profiling_dataframe(complexome_profiling_dataframe):
     """
     Order the complexome profiling dataframe so the pattern emerges: sample iBAQ columns - sample clustered column - etc. - global clustered column
@@ -706,6 +680,9 @@ def order_complexome_profiling_dataframe(complexome_profiling_dataframe):
                 ordered_columns.append(column_value)
         if cluster_column != "": ordered_columns.append(cluster_column)
     ordered_columns.extend([x for x in complexome_profiling_dataframe.columns[complexome_profiling_dataframe.columns.str.contains(global_key_word)]])
+    for column in complexome_profiling_dataframe.columns:
+        if not column in ordered_columns:
+            ordered_columns.insert(0, column) 
     complexome_profiling_dataframe = complexome_profiling_dataframe.reindex(columns=ordered_columns)
     return complexome_profiling_dataframe
 
@@ -788,7 +765,6 @@ def filter_dataframe_step(protein_groups_dataframe, settings_dict):
     else:
         print("The main dataframe will not be filtered because the filter step has been disabled")
         print("-"*50)
-        return 
     return protein_groups_dataframe, non_selected_dataframe
 
 def fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict):
@@ -849,8 +825,7 @@ def apply_clustering_step(settings_dict, protein_groups_dataframe):
     protein_groups_dataframe = pd.DataFrame()
     """
     if settings_dict["steps_dict"]["clustering_step"] == True:
-        sample_names = list(set([i[1].split("_")[0] for i in protein_groups_dataframe.columns.str.split(" ") if i[0] == "iBAQ" and len(i) > 1]))
-        print(sample_names)
+        sample_names = list(set([column[1].split("_")[0] for column in protein_groups_dataframe.columns.str.split(" ") if column[0] == "iBAQ" and len(column) > 1]))
         for sample_name in sample_names:
             print(f"Start hierarchical clustering for sample {sample_name}")
             sample_specific_dataframe = pd.DataFrame(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains(pat=f"iBAQ {sample_name}", regex=True)]], dtype="float64")
@@ -899,9 +874,8 @@ if __name__ == "__main__":
     protein_groups_dataframe = is_protein_in_mitocarta_step(settings_dict, protein_groups_dataframe)
     
     protein_groups_dataframe = apply_clustering_step(settings_dict, protein_groups_dataframe)
-    
-    dump_to_excel_step(protein_groups_dataframe, non_selected_dataframe, settings_dict)
-    
 
     #this line of code is usefull for testing purposes
     #protein_groups_dataframe.to_csv("excel_input.csv", sep=",", index=False) 
+    
+    dump_to_excel_step(protein_groups_dataframe, non_selected_dataframe, settings_dict)
