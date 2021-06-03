@@ -67,11 +67,14 @@ def read_in_protein_groups_file(filename):
         number_of_columns = protein_groups_dataframe.shape[1]
     except FileNotFoundError as file_not_found_error:
         print(file_not_found_error)
+        sys.exit()
     except IOError as io_error:
         print(io_error)
+        sys.exit()
     except Exception as error:
         print(f"Something went wrong while reading in \'{filename}\', please see the error below:")
         print(error)
+        sys.exit()
     print(f"Succesfully read in \'{filename}\' and created a dataframe. The dataframe has {number_of_rows} rows and {number_of_columns} columns")
     print("-"*40)
     return protein_groups_dataframe
@@ -630,24 +633,25 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
     """
     print("Start writing away the data to file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
     try:
-    writer = pd.ExcelWriter(settings_dict["make_excel_file_step"]["excel_file_name"], engine='xlsxwriter', mode="w")
-    workbook = writer.book
+        writer = pd.ExcelWriter(settings_dict["make_excel_file_step"]["excel_file_name"], engine='xlsxwriter', mode="w")
+        workbook = writer.book
 
-    protein_groups_dataframe = order_complexome_profiling_dataframe(protein_groups_dataframe)
+        protein_groups_dataframe = order_complexome_profiling_dataframe(protein_groups_dataframe)
 
-    non_selected_dataframe.to_excel(writer, sheet_name = "non selected columns", index=False)
-    protein_groups_dataframe.to_excel(writer, sheet_name = 'data', index=False)
-    worksheet = writer.sheets['data']
-    
-    positions = get_sample_positions(protein_groups_dataframe.columns.tolist())
-    apply_conditional_formating_per_sample(protein_groups_dataframe, positions, writer, worksheet, workbook)
+        non_selected_dataframe.to_excel(writer, sheet_name = "non selected columns", index=False)
+        protein_groups_dataframe.to_excel(writer, sheet_name = 'data', index=False)
+        worksheet = writer.sheets['data']
+
+        positions = get_sample_positions(protein_groups_dataframe.columns.tolist())
+        apply_conditional_formating_per_sample(protein_groups_dataframe, positions, writer, worksheet, workbook)
+
+        writer.save()
     except Exception as error:
         print("An error occured while trying to write away the data.\nPlease see the error below:")
         print(error)
         print("Now what? The main dataframe without the filtered away columns will be written to an .csv file.")
         protein_groups_dataframe.to_csv("maxquant_saved_result.csv", sep=",", index=False)
         print("Succusfully written away the main dataframe to a csv")
-    writer.save()
     print("Finished writing away the data to file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
 
 def make_hyperlink(hyperlink):
