@@ -27,10 +27,11 @@ def get_user_arguments():
     parser.add_argument("filename", help="Group proteins file name", type=str)
     parser.add_argument("settings_filename", help="Settings file name", type=str, default="maxquant_settings.json")
     #useful for not having to write these out each and every time.
-    development_options = [["20190417_Methanop_DDMfull_BLZ2_proteinGroups.txt", "maxquant_settings.json"], ["20200123_Scer_Daniel_NB40_BY4742_DFM6_DFM9_proteinGroups.txt", "maxquant_settings.json"], ["20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "maxquant_settings.json"]]
-    development_arguments = development_options[2]
+    #development_options = [["20190417_Methanop_DDMfull_BLZ2_proteinGroups.txt", "maxquant_settings.json"], ["20200123_Scer_Daniel_NB40_BY4742_DFM6_DFM9_proteinGroups.txt", "maxquant_settings.json"], ["20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "maxquant_settings.json"]]
+    #development_arguments = development_options[2]
 
-    args = parser.parse_args(development_arguments)
+    #args = parser.parse_args(development_arguments)
+    args = parser.parse_args()
     return args
 
 def load_json(json_filepath):
@@ -246,8 +247,8 @@ def fetch_uniprot_annotation(identifiers, settings_dict):
             protein_data_dict = add_string_linkout(protein_data_dict, settings_dict, identifiers_batch)
         #Let the program sleep for a bit else uniprot is going to be overloaded and I get a problem.
         time.sleep(settings_dict["request_idle_time"])
-    return protein_data_dict
     print("Finished fetching data from uniprot")
+    return protein_data_dict
 
 def construct_function_dict(settings_dict):
     """
@@ -369,6 +370,7 @@ def get_protein_name(uniprot_data_dict):
     output:
     protein_name = string
     """
+    protein_name = np.nan
     if "protein" in uniprot_data_dict.keys():
         if "recommendedName" in uniprot_data_dict["protein"].keys(): 
             protein_name = uniprot_data_dict["protein"]["recommendedName"]["fullName"]["value"]
@@ -789,8 +791,6 @@ def fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict):
     """
     if settings_dict["steps_dict"]["uniprot_step"] == True and evaluate_uniprot_settings(settings_dict["uniprot_step"]["uniprot_options"]) == True:
         protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
-##        with open("example_proteins_group_data.json", 'r') as inputfile:
-##            protein_data_dict = json.load(inputfile)
         protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
     else:
         print("Uniprot will not be queried for information due to the step being disabled or none of the fields are set to True.")
@@ -865,8 +865,6 @@ def dump_to_excel_step(protein_groups_dataframe, non_selected_dataframe, setting
     None
     """
     if settings_dict["steps_dict"]["make_excel_file_step"] == True:
-        #read in an example dataframe:
-##        protein_groups_dataframe = pd.read_csv("excel_input.csv", sep=',', index_col = None, low_memory=False)
         dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, settings_dict)
     else:
         print("The data will not be written away to an excel file because the make_excel_file_step has been disabled")
