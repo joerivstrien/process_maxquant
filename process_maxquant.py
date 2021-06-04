@@ -27,12 +27,15 @@ def get_user_arguments():
                                      usage="USAGE: [process_maxquant.exe] --maxquant_file_path [maxquant_file_path] --settings_file_path [settings_file_path]")
     parser.add_argument("--maxquant_file_path", help="The file path to the maxquant file", type=str)
     parser.add_argument("--settings_file_path", help="The path to the settings dict, should be a json file", type=str)
-    #useful for not having to write these out each and every time.
-    #development_options = [["20190417_Methanop_DDMfull_BLZ2_proteinGroups.txt", "maxquant_settings.json"], ["20200123_Scer_Daniel_NB40_BY4742_DFM6_DFM9_proteinGroups.txt", "maxquant_settings.json"], ["20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "maxquant_settings.json"]]
-    #development_arguments = development_options[2]
+    #Test files which are more usefull to have like this instead of having to type them in over and over again:
+    development_options = [["20190417_Methanop_DDMfull_BLZ2_proteinGroups.txt", "maxquant_settings.json"],
+                           ["20200123_Scer_Daniel_NB40_BY4742_DFM6_DFM9_proteinGroups.txt", "maxquant_settings.json"],
+                           ["--maxquant_file_path", "C:\\Users\\ariel\\Documents\\Bio_informatica_bestanden\\maxquant_project\\pythonProject\\20190115_HEKwt_and_MICS1ko_proteinGroups.txt",
+                            "--settings_file_path", "C:\\Users\\ariel\\Documents\\Bio_informatica_bestanden\\maxquant_project\\pythonProject\\maxquant_settings.json"]]
+    development_arguments = development_options[2]
 
-    #args = parser.parse_args(development_arguments)
-    args = parser.parse_args()
+    args = parser.parse_args(development_arguments)
+    #args = parser.parse_args()
     return args
 
 def load_json(json_filepath):
@@ -119,19 +122,16 @@ def filter_dataframe_columns(protein_groups_dataframe, settings_dict):
     print("Start removing unwanted columns from the dataframe:")
     all_dataframe_columns = list(protein_groups_dataframe.columns)
     selected_dataframe_columns = []
-    non_selected_dataframe_columns = []
     for key_word, method in zip(["EXACT_MATCHES", "CONTAINS"], ["exact_matches", "contains"]):
         selected_columns = select_columns(all_dataframe_columns, settings_dict[key_word], method)
         selected_dataframe_columns.extend(selected_columns)
-    non_selected_dataframe_columns = list(set(protein_groups_dataframe.columns).difference(selected_dataframe_columns))
-    non_selected_dataframe = protein_groups_dataframe[non_selected_dataframe_columns]
     protein_groups_dataframe = protein_groups_dataframe[selected_dataframe_columns]
     
     number_of_rows = protein_groups_dataframe.shape[0]
     number_of_columns = protein_groups_dataframe.shape[1]
     print(f"Finished removing unwanted columns from the dataframe. The filtered dataframe has {number_of_rows} rows and {number_of_columns} columns")
     print("-"*40)
-    return protein_groups_dataframe, non_selected_dataframe
+    return protein_groups_dataframe
 
 def select_columns(all_column_names, selected_column_names, method):
     """
@@ -170,7 +170,7 @@ def filter_dataframe_rows(protein_groups_dataframe, settings_dict):
     filtered_groups_dataframe = protein_groups_dataframe.loc[applying_rows]
     protein_groups_dataframe = protein_groups_dataframe.loc[non_applying_rows]
     #drop any row containing NA values:
-    protein_groups_dataframe = protein_groups_dataframe.dropna(axis="index")
+    protein_groups_dataframe.dropna(axis="index", inplace=True)
     number_of_rows = protein_groups_dataframe.shape[0]
     number_of_columns = protein_groups_dataframe.shape[1]
     print(f"Finished filtering out unwanted proteins. The filtered dataframe has {number_of_rows} rows and {number_of_columns} columns")
@@ -633,7 +633,7 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
     The last part of this script, dump the complexome profiling data into an excel file.
     input:
     protein_groups_dataframe = pd.DataFrame()
-    non_selected_dataframe = pd.DataFrame()
+    non_selected_dataframe = pd.DataFrame(), proteins that have been filtered away in the analysis
     settings_dict = dict, dictionary with parameters for this function
     output:
     None
@@ -645,7 +645,7 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
 
         protein_groups_dataframe = order_complexome_profiling_dataframe(protein_groups_dataframe)
 
-        non_selected_dataframe.to_excel(writer, sheet_name = "non selected columns", index=False)
+        non_selected_dataframe.to_excel(writer, sheet_name = 'filtered away proteins', index=False)
         protein_groups_dataframe.to_excel(writer, sheet_name = 'data', index=False)
         worksheet = writer.sheets['data']
 
@@ -658,7 +658,7 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
         print(error)
         print("Now what? The main dataframe without the filtered away columns will be written to an .csv file.")
         protein_groups_dataframe.to_csv("maxquant_saved_result.csv", sep=",", index=False)
-        print("Succusfully written away the main dataframe to a csv")
+        print("Succesfully written away the main dataframe to a csv")
     print("Finished writing away the data to file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
 
 def make_hyperlink(hyperlink):
@@ -775,7 +775,7 @@ def filter_dataframe_step(protein_groups_dataframe, settings_dict):
     non_selected_dataframe = pd.DataFrame()
     """
     if settings_dict["steps_dict"]["filtering_step"] == True:
-        protein_groups_dataframe, non_selected_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict["filtering_step"])
+        protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict["filtering_step"])
         protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict["filtering_step"])
         #Reset the index, through this way new columns can be added to the dataframe 
         protein_groups_dataframe.reset_index(inplace=True)
@@ -783,7 +783,7 @@ def filter_dataframe_step(protein_groups_dataframe, settings_dict):
     else:
         print("The main dataframe will not be filtered because the filter step has been disabled")
         print("-"*50)
-    return protein_groups_dataframe, non_selected_dataframe
+    return protein_groups_dataframe, filtered_groups_dataframe
 
 def fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict):
     """
@@ -859,18 +859,18 @@ def apply_clustering_step(settings_dict, protein_groups_dataframe):
         print("-"*50)
         
     return protein_groups_dataframe
-def dump_to_excel_step(protein_groups_dataframe, non_selected_dataframe, settings_dict):
+def dump_to_excel_step(protein_groups_dataframe, filtered_groups_dataframe, settings_dict):
     """
     write away dataframe to an excel file:
     input:
-    protein_groups_dataframe = pd.DataFrame()
-    non_selected_dataframe = pd.DataFrame()
+    protein_groups_dataframe = pd.DataFrame(), dataframe containing all the selected proteins
+    filtered_groups_dataframe = pd.DataFrame(), dataframe containing all the filtered proteins
     settings_dict = dict, dictionary with user defined settings
     output:
     None
     """
     if settings_dict["steps_dict"]["make_excel_file_step"] == True:
-        dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, settings_dict)
+        dump_data_to_excel(protein_groups_dataframe, filtered_groups_dataframe, settings_dict)
     else:
         print("The data will not be written away to an excel file because the make_excel_file_step has been disabled")
         return
@@ -881,7 +881,7 @@ if __name__ == "__main__":
     settings_dict = load_json(args.settings_file_path)
     protein_groups_dataframe = read_in_protein_groups_file(args.maxquant_file_path)
 
-    protein_groups_dataframe, non_selected_dataframe = filter_dataframe_step(protein_groups_dataframe, settings_dict)
+    protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_step(protein_groups_dataframe, settings_dict)
     
     protein_groups_dataframe = fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict)
     
@@ -889,4 +889,4 @@ if __name__ == "__main__":
     
     protein_groups_dataframe = apply_clustering_step(settings_dict, protein_groups_dataframe) 
     
-    dump_to_excel_step(protein_groups_dataframe, non_selected_dataframe, settings_dict)
+    dump_to_excel_step(protein_groups_dataframe, filtered_groups_dataframe, settings_dict)
