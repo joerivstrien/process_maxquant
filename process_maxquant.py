@@ -184,9 +184,14 @@ def select_proteins(row_labels_index, protein_filters):
     non_applying_proteins = list, list with rows not to keep
     applying_proteins = list, list of rows to keep
     """
-    for protein_filter in protein_filters:
-        non_applying_proteins = [row for row in row_labels_index if not protein_filter in row]
-        applying_proteins = [row for row in row_labels_index if protein_filter in row]
+    non_applying_proteins = []
+    applying_proteins = []
+    for row_label in row_labels_index:
+        for protein_filter in protein_filters:
+            if protein_filter in row_label and not row_label in non_applying_proteins:
+                non_applying_proteins.append(row_label)
+            elif not protein_filter in row_label and not row_label in applying_proteins:
+                applying_proteins.append(row_label)
         
     return non_applying_proteins, applying_proteins
 

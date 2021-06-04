@@ -31,7 +31,7 @@ If windows doesn't recognize the files or it is more convenient to keep the file
 2. filtering_step -> parameters for the filtering step
    1. EXACT_MATCHES -> Retain columns which match exactly the values in this list
    2. CONTAINS -> Columns containing elements from this list should be retained
-   3. PROTEIN_FILTERS -> Columns containing elements from this list will not be retained
+   3. PROTEIN_FILTERS -> Rows/proteins containing elements from this list will not be retained(will be written to a separate excel sheet) 
 
 3. uniprot_step -> parameters for querying uniprot
    1. uniprot_options -> a dictionary similiar to steps_dict which enables the user to define which elements should be retrieved from uniprot.
