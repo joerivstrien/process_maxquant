@@ -3,7 +3,7 @@ This repository serves as a place to store code in order to process a maxquant f
 <h3>Usage</h3>
 In order to use this script you first need to download an executable and user defined settings file.
 First step, go to the releases web page:
-![Alt text](find_releases.png?raw=true "Go to the releases webpage")
+![Alt text](find_releases.png?raw=true "Go to the releases webpage on github")
 
 Second step, download from the newest release the executable file and the 'maxquant_settings.json' file. 
 ![Alt text](download_this_file.png?raw=true "Download the .exe file and maxquant_settings.json")
