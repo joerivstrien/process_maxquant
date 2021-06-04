@@ -28,14 +28,11 @@ def get_user_arguments():
     parser.add_argument("--maxquant_file_path", help="The file path to the maxquant file", type=str)
     parser.add_argument("--settings_file_path", help="The path to the settings dict, should be a json file", type=str)
     #Test files which are more usefull to have like this instead of having to type them in over and over again:
-    development_options = [["20190417_Methanop_DDMfull_BLZ2_proteinGroups.txt", "maxquant_settings.json"],
-                           ["20200123_Scer_Daniel_NB40_BY4742_DFM6_DFM9_proteinGroups.txt", "maxquant_settings.json"],
-                           ["--maxquant_file_path", "C:\\Users\\ariel\\Documents\\Bio_informatica_bestanden\\maxquant_project\\pythonProject\\20190115_HEKwt_and_MICS1ko_proteinGroups.txt",
-                            "--settings_file_path", "C:\\Users\\ariel\\Documents\\Bio_informatica_bestanden\\maxquant_project\\pythonProject\\maxquant_settings.json"]]
-    development_arguments = development_options[2]
+    #development_options = [["20190417_Methanop_DDMfull_BLZ2_proteinGroups.txt", "maxquant_settings.json"], ["20200123_Scer_Daniel_NB40_BY4742_DFM6_DFM9_proteinGroups.txt", "maxquant_settings.json"],["--maxquant_file_path", "C:\\Users\\ariel\\Documents\\Bio_informatica_bestanden\\maxquant_project\\pythonProject\\20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "--settings_file_path", "C:\\Users\\ariel\\Documents\\Bio_informatica_bestanden\\maxquant_project\\pythonProject\\maxquant_settings.json"]]
+    #development_arguments = development_options[2]
 
-    args = parser.parse_args(development_arguments)
-    #args = parser.parse_args()
+    #args = parser.parse_args(development_arguments)
+    args = parser.parse_args()
     return args
 
 def load_json(json_filepath):

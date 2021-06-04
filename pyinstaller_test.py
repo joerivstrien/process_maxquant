@@ -7,5 +7,5 @@ print(dist_path)
 PyInstaller.__main__.run([
     'process_maxquant.py',
     '--distpath', dist_path,
-    '--onedir',
-    '--name', "test_4"])
+    '--onefile',
+    '--name', "test_5"])
