@@ -14,7 +14,6 @@ import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as spd
 import openpyxl
 import xlsxwriter
-#mpl = MatPlotLib
 
 def get_user_arguments():
     """
@@ -24,8 +23,8 @@ def get_user_arguments():
     output:
     args = argparse object
     """
-    parser = argparse.ArgumentParser(description="Process maxquant executable, please use complete file paths because else errors occur",
-                                     usage="USAGE: [process_maxquant.exe] [maxquant_file_path] [settings_file_path]")
+    parser = argparse.ArgumentParser(description="Process maxquant files, please use complete file paths because else errors occur",
+                                     usage="USAGE: [process_maxquant.exe] --maxquant_file_path [maxquant_file_path] --settings_file_path [settings_file_path]")
     parser.add_argument("--maxquant_file_path", help="The file path to the maxquant file", type=str)
     parser.add_argument("--settings_file_path", help="The path to the settings dict, should be a json file", type=str)
     #useful for not having to write these out each and every time.
