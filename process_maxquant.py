@@ -14,6 +14,7 @@ import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as spd
 import openpyxl
 import xlsxwriter
+#mpl = MatPlotLib
 
 def get_user_arguments():
     """
@@ -619,13 +620,13 @@ def cluster_reorder(sample_specific_dataframe, method = 'average', metric = 'cor
         condensed_distance_matrix = spd.pdist(np.array(sample_specific_dataframe))
 
         clustered = sch.linkage(condensed_distance_matrix, method = method, metric = metric, optimal_ordering = True)
-        dendrogram = sch.dendrogram(clustered,labels = sample_specific_dataframe.index.values, orientation = 'right')
+        dendrogram = sch.dendrogram(clustered,labels = sample_specific_dataframe.index.values, orientation = 'right', no_plot=True)
         ordered_index = sample_specific_dataframe.iloc[dendrogram['leaves'],:].index.values
         order = {label:ix for ix,label in enumerate(ordered_index)}
     except Exception as error:
         print("An exception occured while applying clustering on a sample. Please see the error below: ")
         print(error)
-        return {}, np.array()
+        return {}, np.empty([0,0], dtype="float64")
     return order, clustered
 
 def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, settings_dict):
