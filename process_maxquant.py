@@ -23,9 +23,10 @@ def get_user_arguments():
     output:
     args = argparse object
     """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("filename", help="Group proteins file name", type=str)
-    parser.add_argument("settings_filename", help="Settings file name", type=str, default="maxquant_settings.json")
+    parser = argparse.ArgumentParser(description="Process maxquant executable, please use complete file paths because else errors occur",
+                                     usage="USAGE: [process_maxquant.exe] [maxquant_file_path] [settings_file_path]")
+    parser.add_argument("--maxquant_file_path", help="The file path to the maxquant file", type=str)
+    parser.add_argument("--settings_file_path", help="The path to the settings dict, should be a json file", type=str)
     #useful for not having to write these out each and every time.
     #development_options = [["20190417_Methanop_DDMfull_BLZ2_proteinGroups.txt", "maxquant_settings.json"], ["20200123_Scer_Daniel_NB40_BY4742_DFM6_DFM9_proteinGroups.txt", "maxquant_settings.json"], ["20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "maxquant_settings.json"]]
     #development_arguments = development_options[2]
@@ -48,10 +49,13 @@ def load_json(json_filepath):
         with open(json_filepath) as json_file:
             json_object = json.load(json_file)
     except FileNotFoundError as file_not_found_error:
+        print(f"The settings file at {json_filepath} was not found, please try again")
         print(file_not_found_error)
+        sys.exit()
     except Exception as error:
         print("A unhandled error has occurred while reading {json_file_path}, please see error belows:")
         print(error)
+        sys.exit()
     print("Succesfully read in the settings")
     return json_object
 def read_in_protein_groups_file(filename):
@@ -67,6 +71,7 @@ def read_in_protein_groups_file(filename):
         number_of_rows = protein_groups_dataframe.shape[0]
         number_of_columns = protein_groups_dataframe.shape[1]
     except FileNotFoundError as file_not_found_error:
+        print(f"The maxquant file \'{filename}\' was not found, please try again. ")
         print(file_not_found_error)
         sys.exit()
     except IOError as io_error:
@@ -873,8 +878,8 @@ def dump_to_excel_step(protein_groups_dataframe, non_selected_dataframe, setting
 if __name__ == "__main__":
     args = get_user_arguments()
     
-    settings_dict = load_json(args.settings_filename)
-    protein_groups_dataframe = read_in_protein_groups_file(args.filename)
+    settings_dict = load_json(args.settings_file_path)
+    protein_groups_dataframe = read_in_protein_groups_file(args.maxquant_file_path)
 
     protein_groups_dataframe, non_selected_dataframe = filter_dataframe_step(protein_groups_dataframe, settings_dict)
     
