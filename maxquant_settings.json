@@ -44,10 +44,11 @@
 
             "uniprot_base_url":"https://www.ebi.ac.uk/proteins/api/proteins?",
             "uniprot_request_url":"offset=0&size=100&accession=",
-            "request_idle_time":2,
+            "request_idle_time":4,
             "batch_amount":100,
             "uniprot_protein_base_url":"https://www.uniprot.org/uniprot/",
-
+	    "known_gene_names": ["name", "orfNames"],
+	    "known_protein_names": ["recommendedName","submittedName","alternativeName"],
             "string_linkout_parameters":
                 {
                     "string_base_url":"https://string-db.org/network/",

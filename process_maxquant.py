@@ -229,6 +229,7 @@ def fetch_uniprot_annotation(identifiers, settings_dict):
     """
     input:
     identifiers = pd.Series
+    settings_dict = dict["uniprot_step"], dictionary containing information about the uniprot user definable parameters.
     output:
     protein_data_list = list, list of protein_data_dict
     """
@@ -240,7 +241,7 @@ def fetch_uniprot_annotation(identifiers, settings_dict):
     #split identifiers into multiple sub arrays of length batch_length:
     identifier_batches = np.split(identifiers, range(settings_dict["batch_amount"],len(identifiers), settings_dict["batch_amount"]))
     for n_batch, identifiers_batch in enumerate(identifier_batches):
-        print(f"Start fetching uniprot data for batch number {n_batch} of the total {len(identifier_batches)} batches")
+        print(f"Start fetching uniprot data for batch number {n_batch + 1} of the total {len(identifier_batches)} batches")
         requestURL = settings_dict["uniprot_base_url"]+settings_dict["uniprot_request_url"]+",".join(identifiers_batch)
         request = requests.get(requestURL, headers={"Accept" : "application/json"})
         if not request.ok:
@@ -252,7 +253,7 @@ def fetch_uniprot_annotation(identifiers, settings_dict):
             protein_data_dict = update_protein_data_dict(request.json(), identifiers_batch, function_dict, protein_data_dict, settings_dict)
             protein_data_dict = add_uniprot_hyperlink(protein_data_dict, settings_dict, identifiers_batch)
             protein_data_dict = add_string_linkout(protein_data_dict, settings_dict, identifiers_batch)
-            print(f"Succesfully fetched and saved data from uniprot for batch {n_batch}:")
+            print(f"Succesfully fetched and saved data from uniprot for batch {n_batch + 1}:")
         #Let the program sleep for a bit else uniprot is going to be overloaded and I get a problem.
         time.sleep(settings_dict["request_idle_time"])
     print("Finished fetching data from uniprot")
@@ -297,7 +298,7 @@ def update_protein_data_dict(uniprot_output_list, identifiers, function_dict, pr
                 protein_data_dict[identifier].update({function_name : np.nan})
             else:
                 try:
-                    protein_data_dict[identifier].update({function_name : function(uniprot_data_dict)})
+                    protein_data_dict[identifier].update({function_name : function(uniprot_data_dict, settings_dict)})
                 except KeyError as key_error:
                     print(f"A key error occured for protein {identifier}, the field {function_name} will be ignored for this protein. Please see error message below: ")
                     print(key_error)
@@ -356,43 +357,53 @@ def add_string_linkout(protein_data_dict, settings_dict, identifiers):
             protein_data_dict[identifier].update({"string_linkout":string_linkout_dict[identifier]})
     return protein_data_dict 
 
-def get_uniprot_gene_name(uniprot_data_dict):
+def get_uniprot_gene_name(uniprot_data_dict, settings_dict):
     """
     input:
     uniprot_data_dict = [{accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}], this is the best case scenario.
+    settings_dict = dict, dictionary containing user defined comments
     output:
     gene_name = string
     """
     if "gene" in uniprot_data_dict.keys():
-        gene_name = uniprot_data_dict["gene"][0]["name"]["value"]
+        for uniprot_gene_dict in uniprot_data_dict["gene"]:
+            if list(uniprot_gene_dict.keys())[0] in settings_dict["known_gene_names"]:
+                gene_name = uniprot_data_dict["gene"][0][list(uniprot_gene_dict.keys())[0]]["value"]
+            else:
+                print(f'A new gene name has been found: {list(uniprot_gene_dict.keys())[0]}. You should add this gene name in {settings_dict["known_gene_names"]}')
+                gene_name = uniprot_data_dict["gene"][0][list(uniprot_gene_dict.keys())[0]]["value"]
     else:
         gene_name = np.nan
     return gene_name
 
-def get_protein_name(uniprot_data_dict):
+def get_protein_name(uniprot_data_dict, settings_dict):
     """
     input:
     uniprot_data_dict = [{accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}], this is the best case scenario.
+    settings_dict = dict, dictionary containing user defined comments
     output:
     protein_name = string
     """
-    protein_name = np.nan
     if "protein" in uniprot_data_dict.keys():
-        if "recommendedName" in uniprot_data_dict["protein"].keys(): 
-            protein_name = uniprot_data_dict["protein"]["recommendedName"]["fullName"]["value"]
-        elif "submittedName" in uniprot_data_dict["protein"].keys():
-            protein_name = uniprot_data_dict["protein"]["submittedName"][0]["fullName"]["value"]
-        elif "alternativeName" in uniprot_data_dict["protein"].keys():
-            protein_name = uniprot_data_dict["protein"]["alternativeName"]["fullName"]["value"]
-        else:
-            print("Found a protein name which is not recommonededName or submittedName but: "+", ".join(uniprot_data_dict["protein"].keys()))
-            protein_name = uniprot_data_dict["protein"].values()[0]["fullName"]["value"]
+        for uniprot_protein_name in uniprot_data_dict["protein"].keys():
+            if uniprot_protein_name in settings_dict["known_protein_names"]:
+                if isinstance(uniprot_data_dict["protein"][uniprot_protein_name], list):
+                    protein_name = uniprot_data_dict["protein"][uniprot_protein_name][0]["fullName"]["value"]
+                elif isinstance(uniprot_data_dict["protein"][uniprot_protein_name], dict):
+                    protein_name = uniprot_data_dict["protein"][uniprot_protein_name]["fullName"]["value"]
+                return protein_name
+            else:
+                print(f"A new protein name has been found: {str(uniprot_protein_name)}. You should add this protein name to {settings_dict['known_protein_names']}")
+                protein_name = list(uniprot_data_dict["protein"].values()[0])["fullName"]["value"]
+    else:
+        protein_name = np.nan
     return protein_name
 
-def get_organism_name(uniprot_data_dict):
+def get_organism_name(uniprot_data_dict, settings_dict):
     """
     input:
     uniprot_data_dict = [{accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}], this is the best case scenario.
+    settings_dict = dict, dictionary containing user defined comments
     output:
     organism_name = string 
     """
@@ -402,10 +413,11 @@ def get_organism_name(uniprot_data_dict):
         organism_name = np.nan
     return organism_name
 
-def get_cell_compartment(uniprot_data_dict):
+def get_cell_compartment(uniprot_data_dict, settings_dict):
     """
     input:
     uniprot_data_dict = {accession: "", id:"", proteinExistence:"", info:{}, organism:{}, protein:{}, gene:{}, features:{}, dbReferences:{}, keywords:[], references:[], sequence:{}}, this is the best case scenario.
+    settings_dict = dict, dictionary containing user defined comments
     output:
     cell_compartment=string
     """
