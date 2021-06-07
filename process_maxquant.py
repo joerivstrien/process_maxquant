@@ -367,11 +367,20 @@ def get_uniprot_gene_name(uniprot_data_dict, settings_dict):
     """
     if "gene" in uniprot_data_dict.keys():
         for uniprot_gene_dict in uniprot_data_dict["gene"]:
-            if list(uniprot_gene_dict.keys())[0] in settings_dict["known_gene_names"]:
-                gene_name = uniprot_data_dict["gene"][0][list(uniprot_gene_dict.keys())[0]]["value"]
+            if isinstance(uniprot_gene_dict[list(uniprot_gene_dict.keys())[0]], dict):
+                if list(uniprot_gene_dict.keys())[0] in settings_dict["known_gene_names"]:
+                    gene_name = uniprot_data_dict["gene"][0][list(uniprot_gene_dict.keys())[0]]["value"]
+                else:
+                    print(f'A new gene name has been found: {list(uniprot_gene_dict.keys())[0]}. You should add this gene name in {settings_dict["known_gene_names"]}')
+                    gene_name = uniprot_data_dict["gene"][0][list(uniprot_gene_dict.keys())[0]]["value"]
+            elif isinstance(uniprot_gene_dict[list(uniprot_gene_dict.keys())[0]], list):
+                if list(uniprot_gene_dict.keys())[0] in settings_dict["known_gene_names"]:
+                    gene_name = uniprot_data_dict["gene"][0][list(uniprot_gene_dict.keys())[0]][0]["value"]
+                else:
+                    print(f'A new gene name has been found: {list(uniprot_gene_dict.keys())[0]}. You should add this gene name in {settings_dict["known_gene_names"]}')
+                    gene_name = uniprot_data_dict["gene"][0][list(uniprot_gene_dict.keys())[0]][0]["value"]
             else:
-                print(f'A new gene name has been found: {list(uniprot_gene_dict.keys())[0]}. You should add this gene name in {settings_dict["known_gene_names"]}')
-                gene_name = uniprot_data_dict["gene"][0][list(uniprot_gene_dict.keys())[0]]["value"]
+                print(f"In the extract gene name from uniprot output the type {type(uniprot_gene_dict[list(uniprot_gene_dict.keys())[0]])} has been found while it is not expected")
     else:
         gene_name = np.nan
     return gene_name
