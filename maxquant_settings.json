@@ -2,8 +2,8 @@
 "steps_dict":
     {
         "filtering_step":1,
-        "uniprot_step":1,
-        "mitocarta_step":1,
+        "uniprot_step":0,
+        "mitocarta_step":0,
         "clustering_step":1,
         "make_excel_file_step":1
     },
@@ -60,8 +60,8 @@
     {
         "mitocarta_human_ftp_link":"ftp://ftp.broadinstitute.org/distribution/metabolic/papers/Pagliarini/MitoCarta3.0/Human.MitoCarta3.0.xls",
         "mitocarta_mouse_ftp_link":"ftp://ftp.broadinstitute.org/distribution/metabolic/papers/Pagliarini/MitoCarta3.0/Mouse.MitoCarta3.0.xls",
-        "human_sheet_name":"A Human MitoCarta3.0",
-        "mouse_sheet_name":"A Mouse MitoCarta3.0"
+        "human_sheet_name":"B Human All Genes",
+        "mouse_sheet_name":"B Mouse All Genes"
     },
 
 "clustering_step":

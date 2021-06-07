@@ -29,11 +29,11 @@ def get_user_arguments():
     parser.add_argument("--maxquant_file_path", help="The file path to the maxquant file", type=str)
     parser.add_argument("--settings_file_path", help="The path to the settings dict, should be a json file", type=str)
     #Test files which are more usefull to have like this instead of having to type them in over and over again:
-    #development_options = [["20190417_Methanop_DDMfull_BLZ2_proteinGroups.txt", "maxquant_settings.json"], ["20200123_Scer_Daniel_NB40_BY4742_DFM6_DFM9_proteinGroups.txt", "maxquant_settings.json"],["--maxquant_file_path", "C:\\Users\\ariel\\Documents\\Bio_informatica_bestanden\\maxquant_project\\pythonProject\\20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "--settings_file_path", "C:\\Users\\ariel\\Documents\\Bio_informatica_bestanden\\maxquant_project\\pythonProject\\maxquant_settings.json"]]
-    #development_arguments = development_options[2]
+    development_options = [["20190417_Methanop_DDMfull_BLZ2_proteinGroups.txt", "maxquant_settings.json"], ["20200123_Scer_Daniel_NB40_BY4742_DFM6_DFM9_proteinGroups.txt", "maxquant_settings.json"],["--maxquant_file_path", "C:\\Users\\ariel\\Documents\\Bio_informatica_bestanden\\maxquant_project\\pythonProject\\20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "--settings_file_path", "C:\\Users\\ariel\\Documents\\Bio_informatica_bestanden\\maxquant_project\\pythonProject\\maxquant_settings.json"]]
+    development_arguments = development_options[2]
 
-    #args = parser.parse_args(development_arguments)
-    args = parser.parse_args()
+    args = parser.parse_args(development_arguments)
+    #args = parser.parse_args()
     return args
 
 def load_json(json_filepath):
@@ -165,8 +165,8 @@ def filter_dataframe_rows(protein_groups_dataframe, settings_dict):
     """
     print("Start filtering out unwanted proteins and drop proteins containing NA values: ")
     non_applying_rows, applying_rows = select_proteins(protein_groups_dataframe.index, settings_dict["PROTEIN_FILTERS"])
-    filtered_groups_dataframe = protein_groups_dataframe.loc[applying_rows]
-    protein_groups_dataframe = protein_groups_dataframe.loc[non_applying_rows]
+    filtered_groups_dataframe = protein_groups_dataframe.loc[non_applying_rows]
+    protein_groups_dataframe = protein_groups_dataframe.loc[applying_rows]
     #drop any row containing NA values:
     protein_groups_dataframe.dropna(axis="index", inplace=True)
     number_of_rows = protein_groups_dataframe.shape[0]
@@ -191,8 +191,8 @@ def select_proteins(row_labels_index, protein_filters):
         for protein_filter in protein_filters:
             if protein_filter in row_label and not row_label in non_applying_proteins:
                 non_applying_proteins.append(row_label)
-            elif not protein_filter in row_label and not row_label in applying_proteins:
-                applying_proteins.append(row_label)
+        if not row_label in non_applying_proteins:
+            applying_proteins.append(row_label)
         
     return non_applying_proteins, applying_proteins
 
@@ -593,13 +593,13 @@ def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_species_datafram
         presency_index = protein_groups_dataframe.index[(organism_rows) & (symbol_rows)]
         protein_groups_dataframe[new_column_name] = [1.0 if index in presency_index else 0.0 for index in range(protein_groups_dataframe.shape[0])]
     except IndexError as index_error:
-        print(f"An index error occured while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored, please see the error below: ")
+        print(f"An index error occurred while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored, please see the error below: ")
         print(index_error)
     except ValueError as value_error:
-        print(f"An value error occured while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored, please see the error below: ")
+        print(f"An value error occurred while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored, please see the error below: ")
         print(value_error)
     except Exception as error:
-        print(f"An exception occured while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored, please see the error below: ")
+        print(f"An exception occurred while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored, please see the error below: ")
         print(error)
     print(f"Finished finding proteins found in the {species_name} mitocarta dataset")
     print("-"*40)
@@ -647,7 +647,7 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
         workbook = writer.book
 
         ordered_columns = get_ordered_sample_columns(protein_groups_dataframe)
-        order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns)
+        order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, settings_dict)
 
         non_selected_dataframe.to_excel(writer, sheet_name = 'filtered away proteins', index=False)
         protein_groups_dataframe.to_excel(writer, sheet_name = 'data', index=False)
@@ -801,6 +801,7 @@ def filter_dataframe_step(protein_groups_dataframe, settings_dict):
         protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
     else:
         print("The main dataframe will not be filtered because the filter step has been disabled")
+        filtered_groups_dataframe = pd.DataFrame()
         print("-"*50)
     return protein_groups_dataframe, filtered_groups_dataframe
 
