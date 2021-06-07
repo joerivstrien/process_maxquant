@@ -72,6 +72,7 @@
 
 "make_excel_file_step":
     {
-        "excel_file_name":"processed_maxquant_file.xlsx"
+        "excel_file_name":"processed_maxquant_file.xlsx",
+        "identifier_column_names":["Majority protein IDs", "Protein IDs"]
     }
 }

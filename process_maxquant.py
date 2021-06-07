@@ -14,6 +14,7 @@ import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as spd
 import openpyxl
 import xlsxwriter
+#ToDo, make sure that the first column of both dataframes that are being written away is an identifier column like majority protein IDs. 
 
 def get_user_arguments():
     """
@@ -645,7 +646,8 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
         writer = pd.ExcelWriter(settings_dict["make_excel_file_step"]["excel_file_name"], engine='xlsxwriter', mode="w")
         workbook = writer.book
 
-        protein_groups_dataframe = order_complexome_profiling_dataframe(protein_groups_dataframe)
+        ordered_columns = get_ordered_sample_columns(protein_groups_dataframe)
+        order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns)
 
         non_selected_dataframe.to_excel(writer, sheet_name = 'filtered away proteins', index=False)
         protein_groups_dataframe.to_excel(writer, sheet_name = 'data', index=False)
@@ -676,13 +678,31 @@ def make_hyperlink(hyperlink):
     else:
         return ""
 
-def order_complexome_profiling_dataframe(complexome_profiling_dataframe):
+def order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, settings_dict):
+    """
+    Define the order of the output dataframe. Set the first column to be a identifier column and the rest is not interesting. 
+    input:
+    protein_groups_dataframe = pd.DataFrame()
+    ordered_columns = list, list of column names
+    settings_dict = dict, dictionary with user defined settings
+    output:
+    protein_groups_dataframe = pd.DataFrame
+    """
+    for column in protein_groups_dataframe.columns:
+        if column in settings_dict["make_excel_file_step"]["identifier_column_names"]:
+            ordered_columns.insert(0, column) 
+        if not column in ordered_columns:
+            ordered_columns.insert(len(settings_dict["make_excel_file_step"]["identifier_column_names"]), column) 
+    protein_groups_dataframe = protein_groups_dataframe.reindex(columns=ordered_columns)
+    return protein_groups_dataframe
+
+def get_ordered_sample_columns(complexome_profiling_dataframe):
     """
     Order the complexome profiling dataframe so the pattern emerges: sample iBAQ columns - sample clustered column - etc. - global clustered column
     input:
     complexome_profiling_dataframe = pd.DataFrame()
     output:
-    complexome_profiling_dataframe = pd.DataFrame()
+    ordered_columns = list, list of column names
     """
     ordered_columns = []
     cluster_column = ""
@@ -700,11 +720,8 @@ def order_complexome_profiling_dataframe(complexome_profiling_dataframe):
         if cluster_column != "": ordered_columns.append(cluster_column)
     #add global clustering columns to the end of the ordered_columns list:
     ordered_columns.extend([x for x in complexome_profiling_dataframe.columns[complexome_profiling_dataframe.columns.str.contains(global_key_word)]])
-    for column in complexome_profiling_dataframe.columns:
-        if not column in ordered_columns:
-            ordered_columns.insert(0, column) 
-    complexome_profiling_dataframe = complexome_profiling_dataframe.reindex(columns=ordered_columns)
-    return complexome_profiling_dataframe
+    
+    return ordered_columns
 
 def get_sample_positions(column_names):
     """
