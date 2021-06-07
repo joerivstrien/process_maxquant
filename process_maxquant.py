@@ -735,8 +735,7 @@ def get_sample_positions(column_names):
     positions = list, [[start_position, stop_position], [start_position, stop_position]]
     """
     positions = []
-    start_position = 0
-    end_position = 0
+    start_position, end_position = 0, 0
     for column_name in column_names:
         if "iBAQ" in column_name:
             if start_position == 0:
@@ -745,7 +744,9 @@ def get_sample_positions(column_names):
         else:
             if end_position != 0:
                 positions.append([start_position, end_position])
-                start_position, end_position = 0, 0 
+                start_position, end_position = 0, 0
+    if end_position != 0:
+        positions.append([start_position, end_position])
     return positions
 
 def apply_conditional_formating_per_sample(complexome_profiling_dataframe, positions, writer, worksheet, workbook):
