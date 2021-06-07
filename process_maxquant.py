@@ -647,7 +647,8 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
         workbook = writer.book
 
         ordered_columns = get_ordered_sample_columns(protein_groups_dataframe)
-        order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, settings_dict)
+        protein_groups_dataframe = order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, settings_dict)
+        non_selected_dataframe = order_complexome_profiling_dataframe(non_selected_dataframe, [], settings_dict)
 
         non_selected_dataframe.to_excel(writer, sheet_name = 'filtered away proteins', index=False)
         protein_groups_dataframe.to_excel(writer, sheet_name = 'data', index=False)
@@ -689,10 +690,12 @@ def order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_colum
     protein_groups_dataframe = pd.DataFrame
     """
     for column in protein_groups_dataframe.columns:
-        if column in settings_dict["make_excel_file_step"]["identifier_column_names"]:
-            ordered_columns.insert(0, column) 
         if not column in ordered_columns:
-            ordered_columns.insert(len(settings_dict["make_excel_file_step"]["identifier_column_names"]), column) 
+            ordered_columns.insert(0, column)
+    for identifier_column in settings_dict["make_excel_file_step"]["identifier_column_names"]:
+        if identifier_column in ordered_columns:
+            ordered_columns.pop(ordered_columns.index(identifier_column))
+            ordered_columns.insert(0, identifier_column)
     protein_groups_dataframe = protein_groups_dataframe.reindex(columns=ordered_columns)
     return protein_groups_dataframe
 

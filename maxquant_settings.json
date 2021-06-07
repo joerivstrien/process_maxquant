@@ -4,7 +4,7 @@
         "filtering_step":1,
         "uniprot_step":0,
         "mitocarta_step":0,
-        "clustering_step":1,
+        "clustering_step":0,
         "make_excel_file_step":1
     },
 
@@ -73,6 +73,6 @@
 "make_excel_file_step":
     {
         "excel_file_name":"processed_maxquant_file.xlsx",
-        "identifier_column_names":["Majority protein IDs", "Protein IDs"]
+        "identifier_column_names":["Majority protein IDs", "Protein IDs", "Fasta headers"]
     }
 }
