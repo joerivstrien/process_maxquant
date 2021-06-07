@@ -249,10 +249,10 @@ def fetch_uniprot_annotation(identifiers, settings_dict):
             for identifier in identifiers_batch:
                 protein_data_dict[identifier] = {"gene_name":np.nan, "protein_name":np.nan, "organism_name":np.nan, "hyperlink":np.nan, "cell_compartment":np.nan, "string_linkout":np.nan}
         else:
-            print(f"Succesfully fetched uniprot data for batch {n_batch}:")
             protein_data_dict = update_protein_data_dict(request.json(), identifiers_batch, function_dict, protein_data_dict, settings_dict)
             protein_data_dict = add_uniprot_hyperlink(protein_data_dict, settings_dict, identifiers_batch)
             protein_data_dict = add_string_linkout(protein_data_dict, settings_dict, identifiers_batch)
+            print(f"Succesfully fetched and saved data from uniprot for batch {n_batch}:")
         #Let the program sleep for a bit else uniprot is going to be overloaded and I get a problem.
         time.sleep(settings_dict["request_idle_time"])
     print("Finished fetching data from uniprot")
@@ -354,8 +354,6 @@ def add_string_linkout(protein_data_dict, settings_dict, identifiers):
         string_linkout_dict = get_string_linkout(identifiers, settings_dict["string_linkout_parameters"])
         for identifier in identifiers:
             protein_data_dict[identifier].update({"string_linkout":string_linkout_dict[identifier]})
-            print(protein_data_dict[identifier])
-            print("-"*40)
     return protein_data_dict 
 
 def get_uniprot_gene_name(uniprot_data_dict):

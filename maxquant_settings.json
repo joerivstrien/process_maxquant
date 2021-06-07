@@ -2,9 +2,9 @@
 "steps_dict":
     {
         "filtering_step":1,
-        "uniprot_step":0,
-        "mitocarta_step":0,
-        "clustering_step":0,
+        "uniprot_step":1,
+        "mitocarta_step":1,
+        "clustering_step":1,
         "make_excel_file_step":1
     },
 
