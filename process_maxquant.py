@@ -33,7 +33,11 @@ def get_user_arguments():
 
     #args = parser.parse_args(development_arguments)
     args = parser.parse_args()
+    if not len(sys.argv) > 1:
+        parser.print_help()
+        sys.exit()
     return args
+
 
 def load_json(json_filepath):
     """
