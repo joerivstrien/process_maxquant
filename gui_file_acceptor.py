@@ -14,7 +14,6 @@ from process_maxquant import fetch_uniprot_annotation_step
 from process_maxquant import is_protein_in_mitocarta_step
 from process_maxquant import apply_clustering_step
 from process_maxquant import dump_to_excel_step
-#ToDo, Make sure that the error handling is applied in a way that makes sense for gui's.
 
 class App(QWidget):
     def __init__(self):
@@ -26,8 +25,9 @@ class App(QWidget):
         self.height = 400
 
         self.create_gui_layout()
-        windowLayout = QVBoxLayout()
+        windowLayout = QHBoxLayout()
         windowLayout.addWidget(self.verticalGroupBox)
+        windowLayout.addWidget(self.error_and_status_message_group_box)
         self.setLayout(windowLayout)
 
         self.show()
@@ -44,56 +44,52 @@ class App(QWidget):
         self.setGeometry(self.left, self.top, self.width, self.height)
 
         self.verticalGroupBox = QGroupBox()
-        vertical_layout = QVBoxLayout()
-        horizontal_status_layout = QHBoxLayout()
-        horizontal_message_layout = QHBoxLayout()
-        horizontal_error_status_layout = QHBoxLayout()
-        horizontal_error_message_layout = QHBoxLayout()
+        self.error_and_status_message_group_box = QGroupBox()
+        main_vertical_layout = QVBoxLayout()
+        error_and_status_vertical_layout = QVBoxLayout()
 
         maxquant_file_input_label = QLabel("Select the maxquant file: ")
+        main_vertical_layout.addWidget(maxquant_file_input_label)
+
         status_label = QLabel("Program status: ")
-        horizontal_status_layout.addWidget(maxquant_file_input_label)
-        horizontal_status_layout.addStretch(1)
-        horizontal_status_layout.addWidget(status_label, 1)
-        vertical_layout.addLayout(horizontal_status_layout)
+        error_and_status_vertical_layout.addWidget(status_label)
 
         self.maxquant_file_input_field = QLineEdit()
+        main_vertical_layout.addWidget(self.maxquant_file_input_field)
+
         self.status_message_label = QLabel("Program has not started")
-        horizontal_message_layout.addWidget(self.maxquant_file_input_field)
-        horizontal_message_layout.addStretch(1)
-        horizontal_message_layout.addWidget(self.status_message_label, 1)
-        vertical_layout.addLayout(horizontal_message_layout)
+        error_and_status_vertical_layout.addWidget(self.status_message_label)
+        error_and_status_vertical_layout.addStretch(1)
 
         self.get_maxquant_file_button = QPushButton("Select maxquant file", self)
         self.get_maxquant_file_button.setToolTip("Select the maxquant file where the file should be in the csv format")
         self.get_maxquant_file_button.clicked.connect(self.openFileNameDialog)
-        vertical_layout.addWidget(self.get_maxquant_file_button)
+        main_vertical_layout.addWidget(self.get_maxquant_file_button)
 
         settings_input_label = QLabel("Select the settings file: ")
+        main_vertical_layout.addWidget(settings_input_label)
+
         error_status_label = QLabel("Error message: ")
-        horizontal_error_status_layout.addWidget(settings_input_label)
-        horizontal_error_status_layout.addStretch(1)
-        horizontal_error_status_layout.addWidget(error_status_label, 1)
-        vertical_layout.addLayout(horizontal_error_status_layout)
+        error_and_status_vertical_layout.addWidget(error_status_label)
 
         self.settings_file_input_field = QLineEdit()
+        main_vertical_layout.addWidget(self.settings_file_input_field)
+
         self.error_message_label = QLabel("-")
-        horizontal_error_message_layout.addWidget(self.settings_file_input_field)
-        horizontal_error_message_layout.addStretch(1)
-        horizontal_error_message_layout.addWidget(self.error_message_label, 1)
-        vertical_layout.addLayout(horizontal_error_message_layout)
+        error_and_status_vertical_layout.addWidget(self.error_message_label)
 
         self.get_settings_file_button = QPushButton("Select the settings file", self)
         self.get_settings_file_button.setToolTip("Select the settings file where the file should be in the json format")
         self.get_settings_file_button.clicked.connect(self.openFileNameDialog)
-        vertical_layout.addWidget(self.get_settings_file_button)
+        main_vertical_layout.addWidget(self.get_settings_file_button)
 
         process_maxquant_button = QPushButton('Process maxquant', self)
         process_maxquant_button.setToolTip('Clicking this button will start the program')
         process_maxquant_button.clicked.connect(self.execute_process_maxquant_script)
-        vertical_layout.addWidget(process_maxquant_button)
+        main_vertical_layout.addWidget(process_maxquant_button)
 
-        self.verticalGroupBox.setLayout(vertical_layout)
+        self.error_and_status_message_group_box.setLayout(error_and_status_vertical_layout)
+        self.verticalGroupBox.setLayout(main_vertical_layout)
 
     @pyqtSlot()
     def openFileNameDialog(self):
