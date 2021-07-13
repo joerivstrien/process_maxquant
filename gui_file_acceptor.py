@@ -5,7 +5,7 @@ Description: This code serves to construct a gui, select input files and run the
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QGroupBox, QFileDialog, \
     QVBoxLayout, QLineEdit, QHBoxLayout
-from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtCore import pyqtSlot, QProcess
 
 from process_maxquant import load_json
 from process_maxquant import read_in_protein_groups_file
@@ -83,10 +83,10 @@ class App(QWidget):
         self.get_settings_file_button.clicked.connect(self.openFileNameDialog)
         main_vertical_layout.addWidget(self.get_settings_file_button)
 
-        process_maxquant_button = QPushButton('Process maxquant', self)
-        process_maxquant_button.setToolTip('Clicking this button will start the program')
-        process_maxquant_button.clicked.connect(self.execute_process_maxquant_script)
-        main_vertical_layout.addWidget(process_maxquant_button)
+        self.process_maxquant_button = QPushButton('Process maxquant', self)
+        self.process_maxquant_button.setToolTip('Clicking this button will start the program')
+        self.process_maxquant_button.clicked.connect(self.execute_process_maxquant_script)
+        main_vertical_layout.addWidget(self.process_maxquant_button)
 
         self.error_and_status_message_group_box.setLayout(error_and_status_vertical_layout)
         self.verticalGroupBox.setLayout(main_vertical_layout)
@@ -102,15 +102,31 @@ class App(QWidget):
         elif self.sender() is self.get_maxquant_file_button:
             self.maxquant_file_input_field.setText(file_name)
 
-    def report_status(self):
-        pass
+    def report_status(self, status_message):
+        """"
+        input:
+        status_message = string
+        output:
+        None
+        """
+        self.status_message_label.setText(status_message)
 
-    def report_error(self):
-        pass
+    def report_error(self, error_message):
+        """"
+        Report the error message and close the process of the corresponding button.
+        input:
+        error_message = string
+        output:
+        None
+        """
+        self.error_message_label.setText(error_message)
+        self.report_status("An error has occurred, please see the error report below.")
 
     @pyqtSlot()
     def execute_process_maxquant_script(self):
-        settings_dict = load_json(self.settings_file_input_field.text())
+        settings_dict, is_json_loaded = load_json(self, self.settings_file_input_field.text())
+        if is_json_loaded == False: return
+        #TODO, For each of these functions, (1) implement that command line arguments are logged, (2) messages are sent to the gui and (3) errors are handled.
         protein_groups_dataframe = read_in_protein_groups_file(self.maxquant_file_input_field.text())
 
         protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_step(protein_groups_dataframe,

@@ -1,4 +1,5 @@
 #Import standard python libraries:
+import logging
 import sys
 import requests
 import time
@@ -33,35 +34,43 @@ def get_user_arguments():
 
     #args = parser.parse_args(development_arguments)
     args = parser.parse_args()
+    #Detect whether none arguments were submitted:
     if not len(sys.argv) > 1:
         parser.print_help()
         sys.exit()
     return args
 
 
-def load_json(json_filepath):
+def load_json(gui_object, json_filepath):
     """
     input:
+    gui_object = PyQt5 Qapplication
     json_filepath = string
     output:
     json_object = dict{}
     parameters:
     json_file = IO text object
     """
-    print(f"Read in the settings")
+    logging.info("Start reading the settings file")
+    gui_object.report_status("Start reading the settings file")
     try:
         with open(json_filepath) as json_file:
             json_object = json.load(json_file)
     except FileNotFoundError as file_not_found_error:
-        print(f"The settings file at {json_filepath} was not found, please try again")
-        print(file_not_found_error)
-        sys.exit()
+        error_message = f"The settings file at {json_filepath} was not found, please try again"
+        logging.error(error_message)
+        logging.error(file_not_found_error)
+        gui_object.report_error(error_message)
+        return None, False
     except Exception as error:
-        print("A unhandled error has occurred while reading {json_file_path}, please see error belows:")
-        print(error)
-        sys.exit()
-    print("Succesfully read in the settings")
-    return json_object
+        error_message = f"A unhandled error has occurred while reading {json_filepath}\n"
+        logging.error(error_message)
+        logging.error(error)
+        gui_object.report_error(f"{error_message}{error}")
+        return None, False
+    logging.info("Finished reading in the settings file")
+    gui_object.report_status("Finished reading in the settings file")
+    return json_object, True
 def read_in_protein_groups_file(filename):
     """
     input:
@@ -923,16 +932,16 @@ def dump_to_excel_step(protein_groups_dataframe, filtered_groups_dataframe, sett
     
 if __name__ == "__main__":
     args = get_user_arguments()
-    
+
     settings_dict = load_json(args.settings_file_path)
     protein_groups_dataframe = read_in_protein_groups_file(args.maxquant_file_path)
 
     protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_step(protein_groups_dataframe, settings_dict)
-    
+
     protein_groups_dataframe = fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict)
-    
+
     protein_groups_dataframe = is_protein_in_mitocarta_step(settings_dict, protein_groups_dataframe)
-    
-    protein_groups_dataframe = apply_clustering_step(settings_dict, protein_groups_dataframe) 
-    
+
+    protein_groups_dataframe = apply_clustering_step(settings_dict, protein_groups_dataframe)
+
     dump_to_excel_step(protein_groups_dataframe, filtered_groups_dataframe, settings_dict)
