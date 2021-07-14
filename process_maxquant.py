@@ -102,27 +102,23 @@ def log_error(gui_object, error_message, exception):
     logging.error(exception)
     gui_object.report_error(f"{error_message}\n{exception}")
 
-def read_in_excel_file(filename, sheet_name):
+def read_in_excel_file(gui_object, filename, sheet_name):
     """
     input:
+    gui_object = PyQt5, Qapplication
     filename = string
     sheet_name = string
     output:
     dataframe = pd.DataFrame()
     """
-    print(f"Read in {filename} for sheet {sheet_name}.")
+    gui_object.report_status(f"Start reading in the excel file {filename} for sheet {sheet_name}.")
     try:
         dataframe = pd.read_excel(io=filename, sheet_name=sheet_name, index_col=None, na_filter=False)
     except FileNotFoundError as file_not_found_error:
-        print(f"The file \'{filename}\' has not been found at the specified location")
-        print(file_not_found_error)
-        sys.exit()
+        log_error(gui_object, f"The excel file \'{filename}\' has not been found at the specified location", file_not_found_error)
     except Exception as error:
-        print(f"Something went wrong while reading in the file \'{filename}\', please see the error below:")
-        print(error)
-        sys.exit()
-    print(f"Succesfully read in\'{filename}\' for sheet {sheet_name} and created a dataframe.")
-    print("-"*40)
+        log_error(gui_object, f"Something went wrong while reading in the excel file \'{filename}\'", error)
+    gui_object.report_status(f"Successfully created a dataframe from excel file \'{filename}\' with sheet {sheet_name}.")
     return dataframe
 
 def filter_dataframe_columns(gui_object, protein_groups_dataframe, settings_dict):
@@ -595,14 +591,14 @@ def evaluate_uniprot_settings(uniprot_options):
     input:
     uniprot_options = dict{"option":boolean}
     output:
-    boolean
+    boolean, True whenever at least 1 element is True and False if all elements are False
     """
-    #any() returns True whenever one element is True and False if all elements are False.
     return any(uniprot_options.values())
 
-def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_species_dataframe, species_name, new_column_name):
+def is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_species_dataframe, species_name, new_column_name):
     """
     input:
+    gui_object = PyQt5, Qapplication
     protein_groups_dataframe = pd.DataFrame()
     mitocarta_species_dataframe = pd.DataFrame()
     species_name = string
@@ -610,10 +606,10 @@ def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_species_datafram
     output:
     protein_groups_dataframe = pd.DataFrame()
     """
-    print(f"Start finding proteins found in the {species_name} mitocarta dataset")
+    gui_object.report_status(f"Start elucidating which proteins are present in the {species_name} mitocarta dataset")
     protein_groups_dataframe["gene_name"].fillna('', inplace=True)
     mitocarta_species_dataframe["Synonyms"].fillna('', inplace=True)
-    #In the mitocarta_mouse_data there are several synonyms which are floats, in order to remove these the following line of code is needed:
+    #In the mitocarta_mouse_data there are several synonyms which are not string, in order to remove these I wrote the  following line of code:
     mitocarta_species_dataframe["Synonyms"].where(cond=[True if type(x) == str else False for x in mitocarta_species_dataframe["Synonyms"].str.split("|")], other="-", inplace=True)
 
     try:
@@ -624,16 +620,12 @@ def is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_species_datafram
         presency_index = protein_groups_dataframe.index[(organism_rows) & (symbol_rows)]
         protein_groups_dataframe[new_column_name] = [1.0 if index in presency_index else 0.0 for index in range(protein_groups_dataframe.shape[0])]
     except IndexError as index_error:
-        print(f"An index error occurred while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored, please see the error below: ")
-        print(index_error)
+        log_error(gui_object, f"An index error occurred while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored.", index_error)
     except ValueError as value_error:
-        print(f"An value error occurred while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored, please see the error below: ")
-        print(value_error)
+        log_error(gui_object, f"An value error occurred while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored.", value_error)
     except Exception as error:
-        print(f"An exception occurred while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored, please see the error below: ")
-        print(error)
-    print(f"Finished finding proteins found in the {species_name} mitocarta dataset")
-    print("-"*40)
+        log_error(gui_object, f"An exception occurred while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored.", error)
+    gui_object.report_status(f"Finished elucidating which proteins are found in the {species_name} mitocarta dataset")
     return protein_groups_dataframe
 
 
@@ -876,22 +868,21 @@ def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataf
     """
     if settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == True and \
        settings_dict["uniprot_step"]["uniprot_options"]["get_gene_name"] == True and settings_dict["uniprot_step"]["uniprot_options"]["get_organism_name"] == True:
-        mitocarta_mouse_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_mouse_ftp_link"], settings_dict["mitocarta_step"]["mouse_sheet_name"])
-        mitocarta_human_dataframe = read_in_excel_file(settings_dict["mitocarta_step"]["mitocarta_human_ftp_link"], settings_dict["mitocarta_step"]["human_sheet_name"])
-        protein_groups_dataframe = is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_mouse_dataframe, "Mus musculus", "mitocarta_mouse_presency")
-        protein_groups_dataframe = is_protein_in_mitocarta(protein_groups_dataframe, mitocarta_human_dataframe, "Homo sapiens", "mitocarta_human_presency")
+        mitocarta_mouse_dataframe = read_in_excel_file(gui_object, settings_dict["mitocarta_step"]["mitocarta_mouse_ftp_link"], settings_dict["mitocarta_step"]["mouse_sheet_name"])
+        mitocarta_human_dataframe = read_in_excel_file(gui_object, settings_dict["mitocarta_step"]["mitocarta_human_ftp_link"], settings_dict["mitocarta_step"]["human_sheet_name"])
+        protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_mouse_dataframe, "Mus musculus", "mitocarta_mouse_presency")
+        protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_human_dataframe, "Homo sapiens", "mitocarta_human_presency")
         
     else:
         if settings_dict["steps_dict"]["mitocarta_step"] == False and settings_dict["steps_dict"]["uniprot_step"] == True:
-            print("The final dataframe will not be enriched with information from mitocarta because the mitocarta step is disabled.")
+            gui_object.report_status("The final dataframe will not be enriched with information from mitocarta because the mitocarta step is disabled.")
         elif settings_dict["steps_dict"]["uniprot_step"] == True and settings_dict["uniprot_step"]["uniprot_options"]["get_gene_name"] == False or settings_dict["uniprot_step"]["uniprot_options"]["get_organism_name"] == False:
-            print("Uniprot has been queried but the gene name or the organism name has not been retrieved. Set the organism and gene_name to 1 in order to get the information from mitocarta")
+            gui_object.report_status("Uniprot has been queried but the gene name or the organism name has not been retrieved. Set the organism and gene_name to 1 in order to get the information from mitocarta")
         elif settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == False:
-            print("The final dataframe will not be enriched with information from mitocarta because the uniprot step is disabled.\nUniprot is needed to get per protein the gene symbol, the key to find values in uniprot.")
+            gui_object.report_status("The final dataframe will not be enriched with information from mitocarta because the uniprot step is disabled.\nUniprot is needed to get per protein the gene symbol, the key to find values in uniprot.")
         elif settings_dict["steps_dict"]["mitocarta_step"] == False and settings_dict["steps_dict"]["uniprot_step"] == False:
-            print("The final dataframe will not be enriched with information from mitocarta because the mitocarta and uniprot steps are disabled")
-        print("-"*50)
-        
+            gui_object.report_status("The final dataframe will not be enriched with information from mitocarta because the mitocarta and uniprot steps are disabled")
+
     return protein_groups_dataframe
 
 def apply_clustering_step(gui_object, settings_dict, protein_groups_dataframe):
