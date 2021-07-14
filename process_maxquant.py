@@ -125,9 +125,10 @@ def read_in_excel_file(filename, sheet_name):
     print("-"*40)
     return dataframe
 
-def filter_dataframe_columns(protein_groups_dataframe, settings_dict):
+def filter_dataframe_columns(gui_object, protein_groups_dataframe, settings_dict):
     """
     input:
+    gui_object = PyQt5, Qapplication
     protein_groups_dataframe = pd.DataFrame
     settings_dict = dict{parameter: [values]}
     output:
@@ -137,11 +138,13 @@ def filter_dataframe_columns(protein_groups_dataframe, settings_dict):
     logging.info("Start removing unwanted columns from the dataframe.")
     all_dataframe_columns = list(protein_groups_dataframe.columns)
     selected_dataframe_columns = []
-    for key_word, method in zip(["EXACT_MATCHES", "CONTAINS"], ["exact_matches", "contains"]):
-        selected_columns = select_columns(all_dataframe_columns, settings_dict[key_word], method)
-        selected_dataframe_columns.extend(selected_columns)
-    protein_groups_dataframe = protein_groups_dataframe[selected_dataframe_columns]
-
+    try:
+        for key_word, method in zip(["EXACT_MATCHES", "CONTAINS"], ["exact_matches", "contains"]):
+            selected_columns = select_columns(all_dataframe_columns, settings_dict[key_word], method)
+            selected_dataframe_columns.extend(selected_columns)
+        protein_groups_dataframe = protein_groups_dataframe[selected_dataframe_columns]
+    except IndexError as index_error:
+        log_error(gui_object, f"While filtering the columns the key word {key_word} was not found in the settings", index_error)
     logging.info(f"Finished removing unwanted columns from the dataframe.\n"
                  f"The filtered dataframe has {len(protein_groups_dataframe)} rows and {len(protein_groups_dataframe.columns)} columns")
     return protein_groups_dataframe
@@ -183,7 +186,6 @@ def filter_dataframe_rows(protein_groups_dataframe, settings_dict):
     non_applying_rows, applying_rows = select_proteins(protein_groups_dataframe.index, settings_dict["PROTEIN_FILTERS"])
     filtered_groups_dataframe = protein_groups_dataframe.loc[non_applying_rows]
     protein_groups_dataframe = protein_groups_dataframe.loc[applying_rows]
-    protein_groups_dataframe.dropna(axis="index", inplace=True)
 
     logging.info(f"Finished filtering out proteins not applying to the set protein_filters. "
                  f"The filtered dataframe has {len(protein_groups_dataframe)} rows and {len(protein_groups_dataframe.columns)} columns")
@@ -237,38 +239,38 @@ def parse_identifier(fasta_header):
         logging.error(f'Parsing a fasta header to get the identifier did not work for header {fasta_header}\nPython error: {error}')
         return np.nan
 
-def fetch_uniprot_annotation(identifiers, settings_dict):
+def fetch_uniprot_annotation(gui_object, identifiers, settings_dict):
     """
     input:
+    gui_object = PyQt5, Qapplication
     identifiers = pd.Series
     settings_dict = dict["uniprot_step"], dictionary containing information about the uniprot user definable parameters.
     output:
     protein_data_list = list, list of protein_data_dict
     """
-    print("Start fetching data from uniprot. After each batch {sleep_time} seconds pass before a new barch is queried to uniprot.\nThis safety feature is put in place to prevent being blacklisted."
-          .format(sleep_time=settings_dict["request_idle_time"]))
+    gui_object.report_status("Step 2, fetching data from uniprot. The data is fetched from uniprot in batches, after each batch {sleep_time} seconds pass\n"
+                             "before a new batch is queried to uniprot. This feature is implement to prevent being blacklisted".format(sleep_time=settings_dict["request_idle_time"]))
     protein_data_dict = {}
     function_dict = construct_function_dict(settings_dict)
 
     #split identifiers into multiple sub arrays of length batch_length:
     identifier_batches = np.split(identifiers, range(settings_dict["batch_amount"],len(identifiers), settings_dict["batch_amount"]))
     for n_batch, identifiers_batch in enumerate(identifier_batches):
-        print(f"Start fetching uniprot data for batch number {n_batch + 1} of the total {len(identifier_batches)} batches")
+        logging.info(f"Start fetching uniprot data for batch number {n_batch + 1} of the total {len(identifier_batches)} batches")
         requestURL = settings_dict["uniprot_base_url"]+settings_dict["uniprot_request_url"]+",".join(identifiers_batch)
         request = requests.get(requestURL, headers={"Accept" : "application/json"})
         if not request.ok:
-            print(f"Something went wrong with query {n_batch} while querying the uniprot database. The {len(identifiers)} proteins of this batch will be ignored")
+            logging.error(f"Something went wrong with query {n_batch} while querying the uniprot database. The {len(identifiers)} proteins of this batch will be ignored")
             request.raise_for_status()
             for identifier in identifiers_batch:
                 protein_data_dict[identifier] = {"gene_name":np.nan, "protein_name":np.nan, "organism_name":np.nan, "hyperlink":np.nan, "cell_compartment":np.nan, "string_linkout":np.nan}
         else:
-            protein_data_dict = update_protein_data_dict(request.json(), identifiers_batch, function_dict, protein_data_dict, settings_dict)
+            protein_data_dict = update_protein_data_dict(gui_object, request.json(), identifiers_batch, function_dict, protein_data_dict, settings_dict)
             protein_data_dict = add_uniprot_hyperlink(protein_data_dict, settings_dict, identifiers_batch)
             protein_data_dict = add_string_linkout(protein_data_dict, settings_dict, identifiers_batch)
-            print(f"Succesfully fetched and saved data from uniprot for batch {n_batch + 1}:")
-        #Let the program sleep for a bit else uniprot is going to be overloaded and I get a problem.
+            logging.info(f"Succesfully fetched and saved data from uniprot for batch {n_batch + 1}:")
         time.sleep(settings_dict["request_idle_time"])
-    print("Finished fetching data from uniprot")
+    gui_object.report_status("Step 2, fetching data from uniprot, is finished.")
     return protein_data_dict
 
 def construct_function_dict(settings_dict):
@@ -291,10 +293,11 @@ def construct_function_dict(settings_dict):
             function_dict.update({"cell_compartment":get_cell_compartment})
     return function_dict
 
-def update_protein_data_dict(uniprot_output_list, identifiers, function_dict, protein_data_dict, settings_dict):
+def update_protein_data_dict(gui_object, uniprot_output_list, identifiers, function_dict, protein_data_dict, settings_dict):
     """
     This function is meant to loop over the identifiers and update a dict with values per protein.
     input:
+    gui_object = PyQt5, Qapplication
     identifiers = list, list of uniprot identifiers
     function_dict = dict{function_name(string) : function(function)}
     protein_data_dict = dict{protein : {gene_name, protein_name, organism_name, cell_comparment}}
@@ -312,22 +315,19 @@ def update_protein_data_dict(uniprot_output_list, identifiers, function_dict, pr
                 try:
                     protein_data_dict[identifier].update({function_name : function(uniprot_data_dict, settings_dict)})
                 except KeyError as key_error:
-                    print(f"A key error occured for protein {identifier}, the field {function_name} will be ignored for this protein. Please see error message below: ")
-                    print(key_error)
+                    log_error(gui_object, f"While getting the {function_name} for protein {identifier} a key error occured thus this field will be ignored", key_error)
                     protein_data_dict[identifier].update({function_name : np.nan})
                 except IndexError as index_error:
-                    print(f"A key index occured for protein {identifier}, the field {function_name} will be ignored for this protein. Please see error message below: ")
-                    print(index_error)
+                    log_error(gui_object, f"While getting the {function_name} for protein {identifier} an index error occured thus this field will be ignored", index_error)
                     protein_data_dict[identifier].update({function_name : np.nan})
                 except Exception as exception:
-                    print(f"A general exception occured for protein {identifier}, the field {function_name} will be ignored for this protein. Please see error message below: ")
-                    print(exception)
+                    log_error(gui_object, f"While getting the {function_name} for protein {identifier} an exception error occured thus this field will be ignored", exception)
                     protein_data_dict[identifier].update({function_name : np.nan})
     return protein_data_dict
 
 def get_matching_uniprot_query(uniprot_output_list, identifier):
     """
-    Per batch not all proteins are found. This function returns the uniprot data for the given identfier if it is present in the uniprot output.
+    Per batch not all proteins are found. This function returns the uniprot data for the given identifier if it is present in the uniprot output.
     input:
     uniprot_output_list = list, list of uniprot entries
     identifier = string
@@ -542,14 +542,14 @@ def append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict
     output:
     protein_groups_dataframe = pd.DataFrame
     """
-    print("Start adding the uniprot columns to the existing dataframe")
+    logging.info("Start adding the uniprot columns to the existing dataframe")
+
     uniprot_column_names = get_column_names(uniprot_options_dict)
     for uniprot_column_name in uniprot_column_names:
         uniprot_column_values = get_uniprot_column_values(protein_groups_dataframe["identifier"], uniprot_column_name, protein_data_dict)
         protein_groups_dataframe[uniprot_column_name] = uniprot_column_values
-    print("Finished adding the uniprot columns to the existing dataframe")
-    print("-"*40)
 
+    logging.info("Finished adding the uniprot columns to the existing dataframe")
     return protein_groups_dataframe
 
 def get_column_names(uniprot_options_dict):
@@ -591,7 +591,7 @@ def get_uniprot_column_values(identifiers, uniprot_column_name, protein_data_dic
     return uniprot_column_values
 def evaluate_uniprot_settings(uniprot_options):
     """
-    Evaluate whether the user didn't accidentally put all settings to 0 while the step is 1. 
+    Evaluate whether the user didn't accidentally put all settings to 0 while the uniprot step is set to 1.
     input:
     uniprot_options = dict{"option":boolean}
     output:
@@ -831,18 +831,20 @@ def filter_dataframe_step(gui_object, protein_groups_dataframe, settings_dict):
     """
     if settings_dict["steps_dict"]["filtering_step"] == True:
         gui_object.report_status("Step 1, filtering the dataframe, has started")
-        protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict["filtering_step"])
+
+        protein_groups_dataframe = filter_dataframe_columns(gui_object, protein_groups_dataframe, settings_dict["filtering_step"])
         protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict["filtering_step"])
         #Reset the index, through this way new columns can be added to the dataframe
         protein_groups_dataframe.reset_index(inplace=True)
+        protein_groups_dataframe.dropna(axis="index", inplace=True)
         identifiers = fetch_identifiers(protein_groups_dataframe)
         protein_groups_dataframe['identifier'] = identifiers
+
+        gui_object.report_status("Step 1, filtering the dataframe, is finished")
+        return protein_groups_dataframe, filtered_groups_dataframe
     else:
         gui_object.report_status("Step 1 (filtering the columns and rows of the main dataframe)\nhas been disabled and will be skipped")
         return protein_groups_dataframe, pd.DataFrame()
-
-    gui_object.report_status("Step 1, filtering the dataframe, is finished")
-    return protein_groups_dataframe, filtered_groups_dataframe
 
 def fetch_uniprot_annotation_step(gui_object, protein_groups_dataframe, settings_dict):
     """
@@ -854,11 +856,13 @@ def fetch_uniprot_annotation_step(gui_object, protein_groups_dataframe, settings
     protein_groups_dataframe = pd.DataFrame()
     """
     if settings_dict["steps_dict"]["uniprot_step"] == True and evaluate_uniprot_settings(settings_dict["uniprot_step"]["uniprot_options"]) == True:
-        protein_data_dict = fetch_uniprot_annotation(protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
+        protein_data_dict = fetch_uniprot_annotation(gui_object, protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
         protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
     else:
-        print("Uniprot will not be queried for information due to the step being disabled or none of the fields are set to True.")
-        print("-"*50)
+        if settings_dict["steps_dict"]["uniprot_step"] == False:
+            gui_object.report_status("Uniprot will not be queried for information due to the step being disabled")
+        elif evaluate_uniprot_settings(settings_dict["uniprot_step"]["uniprot_options"]) == False:
+            gui_object.report_status("Uniprot will not be queried for information because the step is enabled, but all the fields are disabled")
     return protein_groups_dataframe
 
 def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataframe):
