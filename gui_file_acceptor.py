@@ -3,6 +3,7 @@ Author: Ariel Komen
 Description: This code serves to construct a gui, select input files and run the process_maxquant script
 """
 import sys
+import logging
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QGroupBox, QFileDialog, \
     QVBoxLayout, QLineEdit, QHBoxLayout
 from PyQt5.QtCore import pyqtSlot, QProcess
@@ -110,6 +111,7 @@ class App(QWidget):
         None
         """
         self.status_message_label.setText(status_message)
+        logging.info(status_message)
 
     def report_error(self, error_message):
         """"

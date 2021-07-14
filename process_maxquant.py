@@ -51,7 +51,6 @@ def load_json(gui_object, json_filepath):
     parameters:
     json_file = IO text object
     """
-    logging.info("Start reading the settings file")
     gui_object.report_status("Start reading the settings file")
     try:
         with open(json_filepath) as json_file:
@@ -62,7 +61,6 @@ def load_json(gui_object, json_filepath):
     except Exception as error:
         log_error(gui_object, f"A unhandled error has occurred while reading {json_filepath}", error)
         return None, False
-    logging.info("Finished reading in the settings file")
     gui_object.report_status("Finished reading in the settings file")
     return json_object, True
 def read_in_protein_groups_file(gui_object, filename):
@@ -73,7 +71,7 @@ def read_in_protein_groups_file(gui_object, filename):
     output:
     protein_groups_dataframe = pd.DataFrame
     """
-    logging.info(f"Read in \'{filename}\'")
+    gui_object.report_status(f"Start reading in \'{filename}\'")
     try:
         protein_groups_dataframe = pd.read_csv(filename, sep='\t', index_col="Majority protein IDs", low_memory=False)
     except FileNotFoundError as file_not_found_error:
@@ -136,18 +134,16 @@ def filter_dataframe_columns(protein_groups_dataframe, settings_dict):
     protein_groups_dataframe = pd.DataFrame
     non_selected_dataframe = pd.DataFrame
     """
-    print("Start removing unwanted columns from the dataframe:")
+    logging.info("Start removing unwanted columns from the dataframe.")
     all_dataframe_columns = list(protein_groups_dataframe.columns)
     selected_dataframe_columns = []
     for key_word, method in zip(["EXACT_MATCHES", "CONTAINS"], ["exact_matches", "contains"]):
         selected_columns = select_columns(all_dataframe_columns, settings_dict[key_word], method)
         selected_dataframe_columns.extend(selected_columns)
     protein_groups_dataframe = protein_groups_dataframe[selected_dataframe_columns]
-    
-    number_of_rows = protein_groups_dataframe.shape[0]
-    number_of_columns = protein_groups_dataframe.shape[1]
-    print(f"Finished removing unwanted columns from the dataframe. The filtered dataframe has {number_of_rows} rows and {number_of_columns} columns")
-    print("-"*40)
+
+    logging.info(f"Finished removing unwanted columns from the dataframe.\n"
+                 f"The filtered dataframe has {len(protein_groups_dataframe)} rows and {len(protein_groups_dataframe.columns)} columns")
     return protein_groups_dataframe
 
 def select_columns(all_column_names, selected_column_names, method):
@@ -168,8 +164,8 @@ def select_columns(all_column_names, selected_column_names, method):
         elif "contains" == method:
             keep_column = [column for column in all_column_names if column.startswith(match)]
         else:
-            print(f"In function 'select_columns' the variable name {method} has been passed but isn't a valid method name. Change this to a valid method name")
-            sys.exit()
+            logging.debug(f"In function 'select_columns' the variable name {method} has been passed but isn't a valid method name. Change this to a valid method name")
+            return
         keep_columns += keep_column
         
     return keep_columns
@@ -180,23 +176,22 @@ def filter_dataframe_rows(protein_groups_dataframe, settings_dict):
     protein_groups_dataframe = pd.DataFrame
     settings_dict = dict{parameter: [values]}
     output:
-    protein_groups_dataframe = pd.DataFrame
+    protein_groups_dataframe = pd.DataFrame, proteins applying to the condition
+    filtered_groups_dataframe = pd.DataFrame, proteins not applying to the condition but should still be retained
     """
-    print("Start filtering out unwanted proteins and drop proteins containing NA values: ")
+    logging.info("Start filtering out unwanted proteins and drop proteins containing NA values: ")
     non_applying_rows, applying_rows = select_proteins(protein_groups_dataframe.index, settings_dict["PROTEIN_FILTERS"])
     filtered_groups_dataframe = protein_groups_dataframe.loc[non_applying_rows]
     protein_groups_dataframe = protein_groups_dataframe.loc[applying_rows]
-    #drop any row containing NA values:
     protein_groups_dataframe.dropna(axis="index", inplace=True)
-    number_of_rows = protein_groups_dataframe.shape[0]
-    number_of_columns = protein_groups_dataframe.shape[1]
-    print(f"Finished filtering out unwanted proteins. The filtered dataframe has {number_of_rows} rows and {number_of_columns} columns")
-    print("-"*40)
+
+    logging.info(f"Finished filtering out proteins not applying to the set protein_filters. "
+                 f"The filtered dataframe has {len(protein_groups_dataframe)} rows and {len(protein_groups_dataframe.columns)} columns")
     return protein_groups_dataframe, filtered_groups_dataframe
 
 def select_proteins(row_labels_index, protein_filters):
     """
-    selects proteins to keep using index and protein_filter, but keep proteins which do not apply to the filter.
+    selects proteins to keep using index(should be Majority_proteins_id) and protein_filter, but keep proteins which do not apply to the filter.
     input:
     row_labels_index = pd.DataFrame().index, the row labels(in this case 'Majority protein IDs') of the dataframe
     protein_filters = list, list of filters 
@@ -220,14 +215,12 @@ def fetch_identifiers(protein_groups_dataframe):
     input:
     protein_groups_dataframe = pd.DataFrame
     output:
-    protein_groups_dataframe = pd.DataFrame
+    identifiers = pd.Series
     """
-    print("Start fetching identifiers: ")
-    protein_groups_dataframe['identifier'] = protein_groups_dataframe['Fasta headers'].apply(parse_identifier)
-    print("Finished fetching identifiers. Please see the first 5 rows of the dataframe: ")
-    print(protein_groups_dataframe.head())
-    print("-"*40)
-    return protein_groups_dataframe
+    logging.info("Start fetching identifiers based on the Fasta headers")
+    identifiers = protein_groups_dataframe['Fasta headers'].apply(parse_identifier)
+    print("Finished fetching identifiers from the fasta headers")
+    return identifiers
 
 def parse_identifier(fasta_header):
     """
@@ -241,7 +234,7 @@ def parse_identifier(fasta_header):
         fasta_identifier = fasta_header.split('|')[1]
         return fasta_identifier
     except Exception as error:
-        print(f'Parsing a fasta header to get the identifier did not work for header {fasta_header}')
+        logging.error(f'Parsing a fasta header to get the identifier did not work for header {fasta_header}\nPython error: {error}')
         return np.nan
 
 def fetch_uniprot_annotation(identifiers, settings_dict):
@@ -829,6 +822,7 @@ def filter_dataframe_step(gui_object, protein_groups_dataframe, settings_dict):
     """
     process group proteins file by filtering columns and rows:
     input:
+    gui_object = PyQt5, Qapplication
     protein_groups_dataframe = pd.DataFrame()
     settings_dict = dict, dictionary with user defined settings
     output:
@@ -836,15 +830,18 @@ def filter_dataframe_step(gui_object, protein_groups_dataframe, settings_dict):
     non_selected_dataframe = pd.DataFrame()
     """
     if settings_dict["steps_dict"]["filtering_step"] == True:
+        gui_object.report_status("Step 1, filtering the dataframe, has started")
         protein_groups_dataframe = filter_dataframe_columns(protein_groups_dataframe, settings_dict["filtering_step"])
         protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_rows(protein_groups_dataframe, settings_dict["filtering_step"])
-        #Reset the index, through this way new columns can be added to the dataframe 
+        #Reset the index, through this way new columns can be added to the dataframe
         protein_groups_dataframe.reset_index(inplace=True)
-        protein_groups_dataframe = fetch_identifiers(protein_groups_dataframe)
+        identifiers = fetch_identifiers(protein_groups_dataframe)
+        protein_groups_dataframe['identifier'] = identifiers
     else:
-        print("The main dataframe will not be filtered because the filter step has been disabled")
-        filtered_groups_dataframe = pd.DataFrame()
-        print("-"*50)
+        gui_object.report_status("Step 1 (filtering the columns and rows of the main dataframe)\nhas been disabled and will be skipped")
+        return protein_groups_dataframe, pd.DataFrame()
+
+    gui_object.report_status("Step 1, filtering the dataframe, is finished")
     return protein_groups_dataframe, filtered_groups_dataframe
 
 def fetch_uniprot_annotation_step(gui_object, protein_groups_dataframe, settings_dict):
