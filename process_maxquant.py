@@ -654,17 +654,18 @@ def cluster_reorder(gui_object, sample_specific_dataframe, method = 'average', m
         log_error(gui_object, "An exception occured while applying clustering on a sample", error)
         return {}, np.empty([0,0], dtype="float64")
 
-def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, settings_dict):
+def dump_data_to_excel(gui_object, protein_groups_dataframe, non_selected_dataframe, settings_dict):
     """
     The last part of this script, dump the complexome profiling data into an excel file.
     input:
+    gui_object = PyQt5, Qapplication
     protein_groups_dataframe = pd.DataFrame()
     non_selected_dataframe = pd.DataFrame(), proteins that have been filtered away in the analysis
     settings_dict = dict, dictionary with parameters for this function
     output:
     None
     """
-    print("Start writing away the data to file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
+    gui_object.report_status("Step 5, start writing away the data to the excel file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
     try:
         writer = pd.ExcelWriter(settings_dict["make_excel_file_step"]["excel_file_name"], engine='xlsxwriter', mode="w")
         workbook = writer.book
@@ -673,8 +674,8 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
         protein_groups_dataframe = order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, settings_dict)
         non_selected_dataframe = order_complexome_profiling_dataframe(non_selected_dataframe, [], settings_dict)
 
-        non_selected_dataframe.to_excel(writer, sheet_name = 'filtered away proteins', index=False)
         protein_groups_dataframe.to_excel(writer, sheet_name = 'data', index=False)
+        non_selected_dataframe.to_excel(writer, sheet_name = 'filtered away proteins', index=False)
         worksheet = writer.sheets['data']
 
         positions = get_sample_positions(protein_groups_dataframe.columns.tolist())
@@ -682,12 +683,9 @@ def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, setting
 
         writer.save()
     except Exception as error:
-        print("An error occured while trying to write away the data.\nPlease see the error below:")
-        print(error)
-        print("Now what? The main dataframe without the filtered away columns will be written to an .csv file.")
+        log_error(gui_object, "An error occured while trying to write away the data. The data will be written away as .csv file", error)
         protein_groups_dataframe.to_csv("maxquant_saved_result.csv", sep=",", index=False)
-        print("Succesfully written away the main dataframe to a csv")
-    print("Finished writing away the data to file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
+    gui_object.report_status("Finished writing away the data to the excel file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
 
 def make_hyperlink(hyperlink):
     """
@@ -925,9 +923,9 @@ def dump_to_excel_step(gui_object, protein_groups_dataframe, filtered_groups_dat
     None
     """
     if settings_dict["steps_dict"]["make_excel_file_step"] == True:
-        dump_data_to_excel(protein_groups_dataframe, filtered_groups_dataframe, settings_dict)
+        dump_data_to_excel(gui_object, protein_groups_dataframe, filtered_groups_dataframe, settings_dict)
     else:
-        print("The data will not be written away to an excel file because the make_excel_file_step has been disabled")
+        logging.info("Step 5, writing away the data to an excel file, will not be executed because the user has disabled the step.")
         return
     
 if __name__ == "__main__":
