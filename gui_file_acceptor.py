@@ -126,18 +126,20 @@ class App(QWidget):
     def execute_process_maxquant_script(self):
         settings_dict, is_json_loaded = load_json(self, self.settings_file_input_field.text())
         if is_json_loaded == False: return
-        #TODO, For each of these functions, (1) implement that command line arguments are logged, (2) messages are sent to the gui and (3) errors are handled.
-        protein_groups_dataframe = read_in_protein_groups_file(self.maxquant_file_input_field.text())
+#TODO, For each of these functions, (1) implement that command line arguments are logged, (2) messages are sent to the gui and (3) errors are handled.
 
-        protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_step(protein_groups_dataframe,
+        protein_groups_dataframe, is_maxquant_file_loaded = read_in_protein_groups_file(self, self.maxquant_file_input_field.text())
+        if is_maxquant_file_loaded == False: return
+
+        protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_step(self, protein_groups_dataframe,
                                                                                     settings_dict)
-        protein_groups_dataframe = fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict)
+        protein_groups_dataframe = fetch_uniprot_annotation_step(self, protein_groups_dataframe, settings_dict)
 
-        protein_groups_dataframe = is_protein_in_mitocarta_step(settings_dict, protein_groups_dataframe)
+        protein_groups_dataframe = is_protein_in_mitocarta_step(self, settings_dict, protein_groups_dataframe)
 
-        protein_groups_dataframe = apply_clustering_step(settings_dict, protein_groups_dataframe)
+        protein_groups_dataframe = apply_clustering_step(self, settings_dict, protein_groups_dataframe)
 
-        dump_to_excel_step(protein_groups_dataframe, filtered_groups_dataframe, settings_dict)
+        dump_to_excel_step(self, protein_groups_dataframe, filtered_groups_dataframe, settings_dict)
 
 
 if __name__ == '__main__':

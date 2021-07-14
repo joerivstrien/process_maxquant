@@ -57,46 +57,53 @@ def load_json(gui_object, json_filepath):
         with open(json_filepath) as json_file:
             json_object = json.load(json_file)
     except FileNotFoundError as file_not_found_error:
-        error_message = f"The settings file at {json_filepath} was not found, please try again"
-        logging.error(error_message)
-        logging.error(file_not_found_error)
-        gui_object.report_error(error_message)
+        log_error(gui_object, f"The settings file at {json_filepath} was not found, please try again", file_not_found_error)
         return None, False
     except Exception as error:
-        error_message = f"A unhandled error has occurred while reading {json_filepath}\n"
-        logging.error(error_message)
-        logging.error(error)
-        gui_object.report_error(f"{error_message}{error}")
+        log_error(gui_object, f"A unhandled error has occurred while reading {json_filepath}", error)
         return None, False
     logging.info("Finished reading in the settings file")
     gui_object.report_status("Finished reading in the settings file")
     return json_object, True
-def read_in_protein_groups_file(filename):
+def read_in_protein_groups_file(gui_object, filename):
     """
     input:
+    gui_object = PyQt5 Qapplication
     string, path of proteingroups file
     output:
     protein_groups_dataframe = pd.DataFrame
     """
-    print(f"Read in \'{filename}\'")
+    logging.info(f"Read in \'{filename}\'")
     try:
-        protein_groups_dataframe = pd.read_csv(filename, sep='\t', index_col = "Majority protein IDs", low_memory=False)
-        number_of_rows = protein_groups_dataframe.shape[0]
-        number_of_columns = protein_groups_dataframe.shape[1]
+        protein_groups_dataframe = pd.read_csv(filename, sep='\t', index_col="Majority protein IDs", low_memory=False)
     except FileNotFoundError as file_not_found_error:
-        print(f"The maxquant file \'{filename}\' was not found, please try again. ")
-        print(file_not_found_error)
-        sys.exit()
+        log_error(gui_object, f"The maxquant file \'{filename}\' was not found, please try again.", file_not_found_error)
+        return None, False
     except IOError as io_error:
-        print(io_error)
-        sys.exit()
+        log_error(gui_object, "An IO(input/output) error occurred while reading in the maxquant file.", io_error)
+        return None, False
     except Exception as error:
-        print(f"Something went wrong while reading in \'{filename}\', please see the error below:")
-        print(error)
-        sys.exit()
-    print(f"Succesfully read in \'{filename}\' and created a dataframe. The dataframe has {number_of_rows} rows and {number_of_columns} columns")
-    print("-"*40)
-    return protein_groups_dataframe
+        log_error(gui_object, f"Something went wrong while reading in \'{filename}\', please see the error below:", error)
+        return None,False
+    logging.info(f"Successfully read in \'{filename}\' and created a dataframe. The dataframe has {len(protein_groups_dataframe)}"
+                 f" rows and {len(protein_groups_dataframe.columns)} columns\n")
+    gui_object.report_status("Finished reading in the maxquant file")
+    return protein_groups_dataframe, True
+
+def log_error(gui_object, error_message, exception):
+    """"
+    This function is meant to generalize the code under each exception clause
+    input:
+    gui_object = PyQt5, Qapplication
+    error_message = string, user defined message
+    exception = string, the error python detected
+    output:
+    None
+    """
+    logging.error(error_message)
+    logging.error(exception)
+    gui_object.report_error(f"{error_message}\n{exception}")
+
 def read_in_excel_file(filename, sheet_name):
     """
     input:
@@ -818,7 +825,7 @@ def apply_cond_format(dataframe,startcol,endcol,writer,worksheet,workbook):
                                                'mid_color' : "#FFFF00",
                                                'max_color' : "#FF0000"})
 
-def filter_dataframe_step(protein_groups_dataframe, settings_dict):
+def filter_dataframe_step(gui_object, protein_groups_dataframe, settings_dict):
     """
     process group proteins file by filtering columns and rows:
     input:
@@ -840,7 +847,7 @@ def filter_dataframe_step(protein_groups_dataframe, settings_dict):
         print("-"*50)
     return protein_groups_dataframe, filtered_groups_dataframe
 
-def fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict):
+def fetch_uniprot_annotation_step(gui_object, protein_groups_dataframe, settings_dict):
     """
     fetch annotation for uniprot identifiers:
     input:
@@ -857,7 +864,7 @@ def fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict):
         print("-"*50)
     return protein_groups_dataframe
 
-def is_protein_in_mitocarta_step(settings_dict, protein_groups_dataframe):
+def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataframe):
     """
     Evaluate per protein if it is found in the mouse or human dataset. 
     input:
@@ -886,7 +893,7 @@ def is_protein_in_mitocarta_step(settings_dict, protein_groups_dataframe):
         
     return protein_groups_dataframe
 
-def apply_clustering_step(settings_dict, protein_groups_dataframe):
+def apply_clustering_step(gui_object, settings_dict, protein_groups_dataframe):
     """
     Apply hierarchical cluster analysis per sample and a global one as well 
     input:
@@ -914,7 +921,7 @@ def apply_clustering_step(settings_dict, protein_groups_dataframe):
         print("-"*50)
         
     return protein_groups_dataframe
-def dump_to_excel_step(protein_groups_dataframe, filtered_groups_dataframe, settings_dict):
+def dump_to_excel_step(gui_object, protein_groups_dataframe, filtered_groups_dataframe, settings_dict):
     """
     write away dataframe to an excel file:
     input:
