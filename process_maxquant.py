@@ -629,11 +629,12 @@ def is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_spec
     return protein_groups_dataframe
 
 
-def cluster_reorder(sample_specific_dataframe, method = 'average', metric = 'correlation'):
+def cluster_reorder(gui_object, sample_specific_dataframe, method = 'average', metric = 'correlation'):
     """
     The complexome profiling data is transformed to a condensed distance matrix and the proteins are clustered using hierarchical clustering. 
     The optimal order is determined resulting in minimal distance between adjacent leaves. 
     input:
+    gui_object = PyQt5, Qapplication
     sample_specific_dataframe = pd.DataFrame()
     method = string
     metric = string
@@ -644,15 +645,14 @@ def cluster_reorder(sample_specific_dataframe, method = 'average', metric = 'cor
     try:
         condensed_distance_matrix = spd.pdist(np.array(sample_specific_dataframe))
 
-        clustered = sch.linkage(condensed_distance_matrix, method = method, metric = metric, optimal_ordering = True)
-        dendrogram = sch.dendrogram(clustered,labels = sample_specific_dataframe.index.values, orientation = 'right', no_plot=True)
+        clustered = sch.linkage(condensed_distance_matrix, method=method, metric=metric, optimal_ordering=True)
+        dendrogram = sch.dendrogram(clustered, labels=sample_specific_dataframe.index.values, orientation='right', no_plot=True)
         ordered_index = sample_specific_dataframe.iloc[dendrogram['leaves'],:].index.values
-        order = {label:ix for ix,label in enumerate(ordered_index)}
+        order = {label: index_x for index_x, label in enumerate(ordered_index)}
+        return order, clustered
     except Exception as error:
-        print("An exception occured while applying clustering on a sample. Please see the error below: ")
-        print(error)
+        log_error(gui_object, "An exception occured while applying clustering on a sample", error)
         return {}, np.empty([0,0], dtype="float64")
-    return order, clustered
 
 def dump_data_to_excel(protein_groups_dataframe, non_selected_dataframe, settings_dict):
     """
@@ -895,23 +895,24 @@ def apply_clustering_step(gui_object, settings_dict, protein_groups_dataframe):
     protein_groups_dataframe = pd.DataFrame()
     """
     if settings_dict["steps_dict"]["clustering_step"] == True:
+        gui_object.report_status("Step 4, cluster the fractions per sample using hierarchical clustering.")
+
         sample_names = list(set([column[1].split("_")[0] for column in protein_groups_dataframe.columns.str.split(" ") if column[0] == "iBAQ" and len(column) > 1]))
         for sample_name in sample_names:
-            print(f"Start hierarchical clustering for sample {sample_name}")
-            sample_specific_dataframe = pd.DataFrame(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains(pat=f"iBAQ {sample_name}", regex=True)]], dtype="float64")
-            order_mapping, clustered = cluster_reorder(sample_specific_dataframe, settings_dict["clustering_step"]["method"], settings_dict["clustering_step"]["metric"])
+            logging.info(f"Start hierarchical clustering for sample {sample_name}")
+            #TODO, check whether this regex to detect sample columns is always correct.
+            sample_specific_dataframe = pd.DataFrame(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains(pat=f"iBAQ {sample_name}_[0-9]{2}", regex=True)]], dtype="float64")
+            order_mapping, clustered = cluster_reorder(gui_object, sample_specific_dataframe, settings_dict["clustering_step"]["method"], settings_dict["clustering_step"]["metric"])
             protein_groups_dataframe[f'sample_{sample_name}_clustered'] = pd.Series(order_mapping)
-            print(f"Finished hierarchical clustering for sample {sample_name}")
-            print("-"*40)
-        print("Start hierarchical clustering for all samples") 
-        global_order_mapping, global_clustered = cluster_reorder(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains("iBAQ")]])
+            logging.info(f"Finished hierarchical clustering for sample {sample_name}")
+        logging.info("Start hierarchical clustering for all samples")
+        #TODO, write a regex taht is able to detect all the sample columns
+        global_order_mapping, global_clustered = cluster_reorder(gui_object, protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains("iBAQ ")]])
         protein_groups_dataframe['global_clustered'] = pd.Series(global_order_mapping)
-        print("Finished hierarchical clustering for all samples")
-        print("-"*40)
+        gui_object.report_status("Step 4, finished clustering the fractions per sample using hierarchical clustering.")
     else:
-        print("Hierarchical clustering will not be applied for the available clusters because the clustering_step has been disabled")
-        print("-"*50)
-        
+        gui_object.report_status("Step 4, clustering the fractions per sample using hierarchical clustering has been disabled.")
+
     return protein_groups_dataframe
 def dump_to_excel_step(gui_object, protein_groups_dataframe, filtered_groups_dataframe, settings_dict):
     """
