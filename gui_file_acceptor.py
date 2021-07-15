@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QGroupBo
     QVBoxLayout, QLineEdit, QHBoxLayout
 from PyQt5.QtCore import pyqtSlot, QProcess
 
+from process_maxquant import check_user_input
 from process_maxquant import load_json
 from process_maxquant import read_in_protein_groups_file
 from process_maxquant import filter_dataframe_step
@@ -126,9 +127,10 @@ class App(QWidget):
 
     @pyqtSlot()
     def execute_process_maxquant_script(self):
+        if check_user_input(self, self.settings_file_input_field.text(), self.maxquant_file_input_field.text()) == False: return
+
         settings_dict, is_json_loaded = load_json(self, self.settings_file_input_field.text())
         if is_json_loaded == False: return
-#TODO, For each of these functions, (1) implement that command line arguments are logged, (2) messages are sent to the gui and (3) errors are handled.
 
         protein_groups_dataframe, is_maxquant_file_loaded = read_in_protein_groups_file(self, self.maxquant_file_input_field.text())
         if is_maxquant_file_loaded == False: return

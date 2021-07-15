@@ -1,5 +1,6 @@
 #Import standard python libraries:
 import logging
+import os.path
 import sys
 import requests
 import time
@@ -39,6 +40,59 @@ def get_user_arguments():
         parser.print_help()
         sys.exit()
     return args
+
+
+def check_user_input(gui_object, settings_file_path, maxquant_file_path):
+    """
+    input:
+    gui_object = PyQt5 Qapplication
+    settings_file_path = string
+    maxquant_file_path = string
+    output:
+    boolean, True == both file_paths are valid and False == both or one file is not valid.
+    """
+    expected_settings_file_extension = ".json"
+    expected_maxquant_file_extension = ".txt"
+    if is_user_input_valid(gui_object, settings_file_path, maxquant_file_path) == False:
+        return False
+    if is_extension_valid(settings_file_path, expected_settings_file_extension) == False:
+        gui_object.report_error(f"The settings file has a different file extension than the expected {expected_settings_file_extension}\nAre you sure it is the correct file?")
+        return False
+    if is_extension_valid(maxquant_file_path, expected_maxquant_file_extension) == False:
+        gui_object.report_error(f"The maxquant file has a different file extension than the expected {expected_maxquant_file_extension}\nAre you sure it is the correct file?")
+        return False
+    return True
+
+
+def is_extension_valid(file_path, prefered_extension):
+    file_extension = os.path.splitext(file_path)[1]
+    if file_extension == prefered_extension:
+        return True
+    else:
+        return False
+
+
+def is_user_input_valid(gui_object, settings_file_path, maxquant_file_path):
+    """
+    Check whether the user submitted two file paths
+    input:
+    gui_object = PyQt5 Qapplication
+    settings_file_path = string
+    maxquant_file_path = string
+    output:
+    boolean, True == both file_paths are not empty and False == both or one file path is empty
+    """
+    if "" == settings_file_path and "" == maxquant_file_path:
+        gui_object.report_error("No arguments were submitted. Select the settings file and a maxquant file in order to let the program work")
+        return False
+    elif "" == settings_file_path:
+        gui_object.report_error("The settings file path was not selected.")
+        return False
+    elif "" == maxquant_file_path:
+        gui_object.report_error("The maxquant file path was not selected.")
+        return False
+    else:
+        return True
 
 
 def load_json(gui_object, json_filepath):
