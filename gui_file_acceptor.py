@@ -113,6 +113,7 @@ class App(QWidget):
         """
         self.status_message_label.setText(status_message)
         logging.info(status_message)
+        QApplication.processEvents()  # This line causes the gui to display the message
 
     def report_error(self, error_message):
         """"
@@ -127,13 +128,21 @@ class App(QWidget):
 
     @pyqtSlot()
     def execute_process_maxquant_script(self):
-        if check_user_input(self, self.settings_file_input_field.text(), self.maxquant_file_input_field.text()) == False: return
+        self.process_maxquant_button.setEnabled(False)
+        logging.basicConfig(filename="process_maxquant.log", filemode="w", level=logging.DEBUG)
+        if check_user_input(self, self.settings_file_input_field.text(), self.maxquant_file_input_field.text()) == False:
+            self.process_maxquant_button.setEnabled(True)
+            return
 
         settings_dict, is_json_loaded = load_json(self, self.settings_file_input_field.text())
-        if is_json_loaded == False: return
+        if is_json_loaded == False:
+            self.process_maxquant_button.setEnabled(True)
+            return
 
         protein_groups_dataframe, is_maxquant_file_loaded = read_in_protein_groups_file(self, self.maxquant_file_input_field.text())
-        if is_maxquant_file_loaded == False: return
+        if is_maxquant_file_loaded == False:
+            self.process_maxquant_button.setEnabled(True)
+            return
 
         protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_step(self, protein_groups_dataframe,
                                                                                     settings_dict)
@@ -145,6 +154,7 @@ class App(QWidget):
 
         dump_to_excel_step(self, protein_groups_dataframe, filtered_groups_dataframe, settings_dict)
 
+        self.process_maxquant_button.setEnabled(True)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

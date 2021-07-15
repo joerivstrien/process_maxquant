@@ -62,7 +62,11 @@
         "mitocarta_human_ftp_link":"ftp://ftp.broadinstitute.org/distribution/metabolic/papers/Pagliarini/MitoCarta3.0/Human.MitoCarta3.0.xls",
         "mitocarta_mouse_ftp_link":"ftp://ftp.broadinstitute.org/distribution/metabolic/papers/Pagliarini/MitoCarta3.0/Mouse.MitoCarta3.0.xls",
         "human_sheet_name":"B Human All Genes",
-        "mouse_sheet_name":"B Mouse All Genes"
+        "mouse_sheet_name":"B Mouse All Genes",
+	"mitocarta_symbol_column":"Symbol",
+	"mitocarta_additional_symbol_column":"Synonyms",
+	"mitocarta_mouse_organism":"Mus musculus",
+	"mitocarta_human_organism":"Homo sapiens"
     },
 
 "clustering_step":

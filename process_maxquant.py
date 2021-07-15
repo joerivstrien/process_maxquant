@@ -138,7 +138,7 @@ def read_in_protein_groups_file(gui_object, filename):
         log_error(gui_object, f"Something went wrong while reading in \'{filename}\', please see the error below:", error)
         return None,False
     logging.info(f"Successfully read in \'{filename}\' and created a dataframe. The dataframe has {len(protein_groups_dataframe)}"
-                 f" rows and {len(protein_groups_dataframe.columns)} columns\n")
+                 f" rows and {len(protein_groups_dataframe.columns)} columns")
     gui_object.report_status("Finished reading in the maxquant file")
     return protein_groups_dataframe, True
 
@@ -220,7 +220,7 @@ def select_columns(all_column_names, selected_column_names, method):
             logging.debug(f"In function 'select_columns' the variable name {method} has been passed but isn't a valid method name. Change this to a valid method name")
             return
         keep_columns += keep_column
-        
+
     return keep_columns
 
 def filter_dataframe_rows(protein_groups_dataframe, settings_dict):
@@ -259,7 +259,7 @@ def select_proteins(row_labels_index, protein_filters):
                 non_applying_proteins.append(row_label)
         if not row_label in non_applying_proteins:
             applying_proteins.append(row_label)
-        
+
     return non_applying_proteins, applying_proteins
 
 def fetch_identifiers(protein_groups_dataframe):
@@ -271,7 +271,7 @@ def fetch_identifiers(protein_groups_dataframe):
     """
     logging.info("Start fetching identifiers based on the Fasta headers")
     identifiers = protein_groups_dataframe['Fasta headers'].apply(parse_identifier)
-    print("Finished fetching identifiers from the fasta headers")
+    logging.info("Finished fetching identifiers from the fasta headers")
     return identifiers
 
 def parse_identifier(fasta_header):
@@ -417,7 +417,7 @@ def add_string_linkout(protein_data_dict, settings_dict, identifiers):
         string_linkout_dict = get_string_linkout(identifiers, settings_dict["string_linkout_parameters"])
         for identifier in identifiers:
             protein_data_dict[identifier].update({"string_linkout":string_linkout_dict[identifier]})
-    return protein_data_dict 
+    return protein_data_dict
 
 def get_uniprot_gene_name(uniprot_data_dict, settings_dict):
     """
@@ -566,7 +566,7 @@ def process_uniprot_identifier_input(identifiers, regex_pattern):
         #each identifier must be spaced besides each other according to the example python3 query from: https://www.uniprot.org/help/api_idmapping, accessed at 31-05-2021
         formatted_identifier_string += identifier+" "
     return formatted_identifier_string
-    
+
 def process_uniprot_mapping_service_output(uniprot_mapped_proteins):
     """
     This function enables to process more than one mapped identifier from the uniprot mapping service.
@@ -649,7 +649,7 @@ def evaluate_uniprot_settings(uniprot_options):
     """
     return any(uniprot_options.values())
 
-def is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_species_dataframe, species_name, new_column_name):
+def is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_species_dataframe, species_name, new_column_name, symbol_column, additional_symbol_column):
     """
     input:
     gui_object = PyQt5, Qapplication
@@ -657,20 +657,23 @@ def is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_spec
     mitocarta_species_dataframe = pd.DataFrame()
     species_name = string
     new_column_name = string
+    symbol_column = string, initial column to evaluate whether proteins are also found in the mitocarta data
+    additional_symbol_column = string, secondary column which should contain multiple symbols for the same gene.
     output:
     protein_groups_dataframe = pd.DataFrame()
     """
     gui_object.report_status(f"Start elucidating which proteins are present in the {species_name} mitocarta dataset")
     protein_groups_dataframe["gene_name"].fillna('', inplace=True)
-    mitocarta_species_dataframe["Synonyms"].fillna('', inplace=True)
+    mitocarta_species_dataframe[additional_symbol_column].fillna('', inplace=True)
     #In the mitocarta_mouse_data there are several synonyms which are not string, in order to remove these I wrote the  following line of code:
-    mitocarta_species_dataframe["Synonyms"].where(cond=[True if type(x) == str else False for x in mitocarta_species_dataframe["Synonyms"].str.split("|")], other="-", inplace=True)
-
+    mitocarta_species_dataframe[additional_symbol_column].where(cond=[True if type(x) == str else False for x in mitocarta_species_dataframe[additional_symbol_column].str.split("|")],
+                                                  other="-", inplace=True)
     try:
         organism_rows = protein_groups_dataframe["organism_name"] == species_name
-        symbol_rows = protein_groups_dataframe["gene_name"].isin([symbol for symbol in protein_groups_dataframe["gene_name"] if mitocarta_species_dataframe["Symbol"].str.contains(symbol).any() == True
-                                                                  or [symbol in series_list for series_list in mitocarta_species_dataframe["Synonyms"].str.split("|")]])
-        
+        symbol_rows = protein_groups_dataframe["gene_name"].isin([symbol for symbol in protein_groups_dataframe["gene_name"]
+                                                                  if mitocarta_species_dataframe[symbol_column].str.contains(symbol).any() == True
+                                                                  or [symbol in series_list for series_list in mitocarta_species_dataframe[additional_symbol_column].str.split("|")]])
+
         presency_index = protein_groups_dataframe.index[(organism_rows) & (symbol_rows)]
         protein_groups_dataframe[new_column_name] = [1.0 if index in presency_index else 0.0 for index in range(protein_groups_dataframe.shape[0])]
     except IndexError as index_error:
@@ -798,7 +801,7 @@ def get_ordered_sample_columns(complexome_profiling_dataframe):
         if cluster_column != "": ordered_columns.append(cluster_column)
     #add global clustering columns to the end of the ordered_columns list:
     ordered_columns.extend([x for x in complexome_profiling_dataframe.columns[complexome_profiling_dataframe.columns.str.contains(global_key_word)]])
-    
+
     return ordered_columns
 
 def get_sample_positions(column_names):
@@ -922,9 +925,13 @@ def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataf
        settings_dict["uniprot_step"]["uniprot_options"]["get_gene_name"] == True and settings_dict["uniprot_step"]["uniprot_options"]["get_organism_name"] == True:
         mitocarta_mouse_dataframe = read_in_excel_file(gui_object, settings_dict["mitocarta_step"]["mitocarta_mouse_ftp_link"], settings_dict["mitocarta_step"]["mouse_sheet_name"])
         mitocarta_human_dataframe = read_in_excel_file(gui_object, settings_dict["mitocarta_step"]["mitocarta_human_ftp_link"], settings_dict["mitocarta_step"]["human_sheet_name"])
-        protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_mouse_dataframe, "Mus musculus", "mitocarta_mouse_presency")
-        protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_human_dataframe, "Homo sapiens", "mitocarta_human_presency")
-        
+        protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_mouse_dataframe,
+                                                           settings_dict["mitocarta_step"]["mitocarta_mouse_organism"], "mitocarta_mouse_presency",
+                                                           settings_dict["mitocarta_step"]["mitocarta_symbol_column"], settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"])
+        protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_human_dataframe,
+                                                           settings_dict["mitocarta_step"]["mitocarta_human_organism"], "mitocarta_human_presency",
+                                                           settings_dict["mitocarta_step"]["mitocarta_symbol_column"], settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"])
+
     else:
         if settings_dict["steps_dict"]["mitocarta_step"] == False and settings_dict["steps_dict"]["uniprot_step"] == True:
             gui_object.report_status("The final dataframe will not be enriched with information from mitocarta because the mitocarta step is disabled.")
@@ -981,7 +988,7 @@ def dump_to_excel_step(gui_object, protein_groups_dataframe, filtered_groups_dat
     else:
         logging.info("Step 5, writing away the data to an excel file, will not be executed because the user has disabled the step.")
         return
-    
+
 if __name__ == "__main__":
     args = get_user_arguments()
 
