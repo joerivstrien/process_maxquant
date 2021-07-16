@@ -117,6 +117,8 @@ def load_json(gui_object, json_filepath):
         return None, False
     gui_object.report_status("Finished reading in the settings file")
     return json_object, True
+
+
 def read_in_protein_groups_file(gui_object, filename):
     """
     input:
@@ -724,7 +726,6 @@ def dump_data_to_excel(gui_object, protein_groups_dataframe, non_selected_datafr
     """
     gui_object.report_status("Step 5, start writing away the data to the excel file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
     try:
-        #two things to do. Firstly, debug this function and make sure that it works as intended. Secondly, calculate per sample for each protein the total iBAQ value and the global iBAQ value.
         writer = pd.ExcelWriter(settings_dict["make_excel_file_step"]["excel_file_name"], engine='xlsxwriter', mode="w")
         workbook = writer.book
 
@@ -773,7 +774,7 @@ def order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_colum
     ordered_columns = list(original_column_order) + list(ordered_columns)
     for column in protein_groups_dataframe.columns:
         if not column in ordered_columns:
-            ordered_columns[-1:].append(column)
+            ordered_columns.append(column)
     for identifier_column in settings_dict["make_excel_file_step"]["identifier_column_names"]:
         if identifier_column in ordered_columns:
             ordered_columns.pop(ordered_columns.index(identifier_column))
@@ -790,22 +791,16 @@ def get_ordered_sample_columns(complexome_profiling_dataframe):
     ordered_columns = list, list of column names
     """
     ordered_columns = []
-    cluster_column = ""
-    cluster_key_word = "clustered"
-    global_key_word = "global"
+    global_cluster_column = "global_clustered"
+    sample_names = get_sample_names(complexome_profiling_dataframe)
 
-    sample_names = list(set([i[1].split("_")[0] for i in complexome_profiling_dataframe.columns.str.split(" ") if i[0] == "iBAQ" and len(i) > 1]))
     for sample_name in sample_names:
-        sample_specific_columns = complexome_profiling_dataframe.columns[complexome_profiling_dataframe.columns.to_series().str.contains(sample_name)]
-        for column_value in sample_specific_columns:
-            if cluster_key_word in column_value:
-                cluster_column = column_value
-            else:
-                ordered_columns.append(column_value)
-        if cluster_column != "": ordered_columns.append(cluster_column)
-    #add global clustering columns to the end of the ordered_columns list:
-    ordered_columns.extend([x for x in complexome_profiling_dataframe.columns[complexome_profiling_dataframe.columns.str.contains(global_key_word)]])
+        sample_columns = select_columns(complexome_profiling_dataframe.columns, f"iBAQ {sample_name}", "contains")
+        ordered_columns.extend(sample_columns)
+        ordered_columns.append(f'sample_{sample_name}_clustered')
 
+    #add global clustering column to the end of the ordered_columns list:
+    ordered_columns.append(global_cluster_column)
     return ordered_columns
 
 def get_sample_positions(column_names):
