@@ -144,7 +144,7 @@ class App(QWidget):
             self.process_maxquant_button.setEnabled(True)
             return
 
-        protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_step(self, protein_groups_dataframe,
+        protein_groups_dataframe, filtered_groups_dataframe, original_column_order = filter_dataframe_step(self, protein_groups_dataframe,
                                                                                     settings_dict)
         protein_groups_dataframe = fetch_uniprot_annotation_step(self, protein_groups_dataframe, settings_dict)
 
@@ -152,7 +152,7 @@ class App(QWidget):
 
         protein_groups_dataframe = apply_clustering_step(self, settings_dict, protein_groups_dataframe)
 
-        dump_to_excel_step(self, protein_groups_dataframe, filtered_groups_dataframe, settings_dict)
+        dump_to_excel_step(self, protein_groups_dataframe, filtered_groups_dataframe, settings_dict, original_column_order)
 
         self.process_maxquant_button.setEnabled(True)
 

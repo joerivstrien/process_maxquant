@@ -306,7 +306,7 @@ def fetch_uniprot_annotation(gui_object, identifiers, settings_dict):
     #split identifiers into multiple sub arrays of length batch_length:
     identifier_batches = np.split(identifiers, range(settings_dict["batch_amount"],len(identifiers), settings_dict["batch_amount"]))
     for n_batch, identifiers_batch in enumerate(identifier_batches):
-        logging.info(f"Start fetching uniprot data for batch number {n_batch + 1} of the total {len(identifier_batches)} batches")
+        gui_object.report_status(f"Start fetching uniprot data for batch number {n_batch + 1} of the total {len(identifier_batches)} batches")
         requestURL = settings_dict["uniprot_base_url"]+settings_dict["uniprot_request_url"]+",".join(identifiers_batch)
         request = requests.get(requestURL, headers={"Accept" : "application/json"})
         if not request.ok:
@@ -711,7 +711,7 @@ def cluster_reorder(gui_object, sample_specific_dataframe, method = 'average', m
         log_error(gui_object, "An exception occured while applying clustering on a sample", error)
         return {}, np.empty([0,0], dtype="float64")
 
-def dump_data_to_excel(gui_object, protein_groups_dataframe, non_selected_dataframe, settings_dict):
+def dump_data_to_excel(gui_object, protein_groups_dataframe, non_selected_dataframe, settings_dict, original_column_order):
     """
     The last part of this script, dump the complexome profiling data into an excel file.
     input:
@@ -724,12 +724,13 @@ def dump_data_to_excel(gui_object, protein_groups_dataframe, non_selected_datafr
     """
     gui_object.report_status("Step 5, start writing away the data to the excel file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
     try:
+        #two things to do. Firstly, debug this function and make sure that it works as intended. Secondly, calculate per sample for each protein the total iBAQ value and the global iBAQ value.
         writer = pd.ExcelWriter(settings_dict["make_excel_file_step"]["excel_file_name"], engine='xlsxwriter', mode="w")
         workbook = writer.book
 
         ordered_columns = get_ordered_sample_columns(protein_groups_dataframe)
-        protein_groups_dataframe = order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, settings_dict)
-        non_selected_dataframe = order_complexome_profiling_dataframe(non_selected_dataframe, [], settings_dict)
+        protein_groups_dataframe = order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, original_column_order, settings_dict)
+        non_selected_dataframe = order_complexome_profiling_dataframe(non_selected_dataframe, [], original_column_order, settings_dict)
 
         protein_groups_dataframe.to_excel(writer, sheet_name = 'data', index=False)
         non_selected_dataframe.to_excel(writer, sheet_name = 'filtered away proteins', index=False)
@@ -739,10 +740,11 @@ def dump_data_to_excel(gui_object, protein_groups_dataframe, non_selected_datafr
         apply_conditional_formating_per_sample(protein_groups_dataframe, positions, writer, worksheet, workbook)
 
         writer.save()
+        gui_object.report_status("Finished writing away the data to the excel file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
     except Exception as error:
         log_error(gui_object, "An error occured while trying to write away the data. The data will be written away as .csv file", error)
         protein_groups_dataframe.to_csv("maxquant_saved_result.csv", sep=",", index=False)
-    gui_object.report_status("Finished writing away the data to the excel file {file_name}".format(file_name=settings_dict["make_excel_file_step"]["excel_file_name"]))
+
 
 def make_hyperlink(hyperlink):
     """
@@ -757,19 +759,21 @@ def make_hyperlink(hyperlink):
     else:
         return ""
 
-def order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, settings_dict):
+def order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, original_column_order, settings_dict):
     """
     Define the order of the output dataframe. Set the first column to be a identifier column and the rest is not interesting. 
     input:
     protein_groups_dataframe = pd.DataFrame()
     ordered_columns = list, list of column names
+    original_column_order = pd.Series(), original column order
     settings_dict = dict, dictionary with user defined settings
     output:
     protein_groups_dataframe = pd.DataFrame
     """
+    ordered_columns = list(original_column_order) + list(ordered_columns)
     for column in protein_groups_dataframe.columns:
         if not column in ordered_columns:
-            ordered_columns.insert(0, column)
+            ordered_columns[-1:].append(column)
     for identifier_column in settings_dict["make_excel_file_step"]["identifier_column_names"]:
         if identifier_column in ordered_columns:
             ordered_columns.pop(ordered_columns.index(identifier_column))
@@ -792,7 +796,7 @@ def get_ordered_sample_columns(complexome_profiling_dataframe):
 
     sample_names = list(set([i[1].split("_")[0] for i in complexome_profiling_dataframe.columns.str.split(" ") if i[0] == "iBAQ" and len(i) > 1]))
     for sample_name in sample_names:
-        sample_specific_columns = protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains(sample_name)]
+        sample_specific_columns = complexome_profiling_dataframe.columns[complexome_profiling_dataframe.columns.to_series().str.contains(sample_name)]
         for column_value in sample_specific_columns:
             if cluster_key_word in column_value:
                 cluster_column = column_value
@@ -887,11 +891,60 @@ def filter_dataframe_step(gui_object, protein_groups_dataframe, settings_dict):
         identifiers = fetch_identifiers(protein_groups_dataframe)
         protein_groups_dataframe['identifier'] = identifiers
 
+        add_protein_abundance_columns(protein_groups_dataframe)
+
         gui_object.report_status("Step 1, filtering the dataframe, is finished")
-        return protein_groups_dataframe, filtered_groups_dataframe
+        return protein_groups_dataframe, filtered_groups_dataframe, protein_groups_dataframe.columns
     else:
         gui_object.report_status("Step 1 (filtering the columns and rows of the main dataframe)\nhas been disabled and will be skipped")
-        return protein_groups_dataframe, pd.DataFrame()
+        return protein_groups_dataframe, pd.DataFrame(), pd.Series()
+
+
+def add_protein_abundance_columns(protein_groups_dataframe):
+    """
+    Per sample for each protein, add the protein abundances of each fraction together.
+    Additionally, add the protein abundances of each fraction from all samples together.
+    input:
+    protein_groups_dataframe = pd.Dataframe
+    output:
+    protein_groups_dataframe = pd.Dataframe
+    """
+    sample_names = get_sample_names(protein_groups_dataframe)
+    for sample_name in sample_names:
+        sample_columns = select_columns(protein_groups_dataframe.columns, [f"iBAQ {sample_name}"], "contains")
+        sample_protein_abundances = protein_groups_dataframe[sample_columns].apply(summing_protein_abundances, axis=1)
+        protein_groups_dataframe[f"{sample_name}_summed_iBAQ_value"] = sample_protein_abundances
+    global_protein_abundances = protein_groups_dataframe[[f"{sample_name}_summed_iBAQ_value" for sample_name in sample_names]].apply(summing_protein_abundances, axis=1)
+    protein_groups_dataframe["global_summed_iBAQ_value"] = global_protein_abundances
+
+
+def get_sample_names(protein_groups_dataframe):
+    """
+    Get the available sample names from the main dataframe
+    input:
+    protein_groups_dataframe = pd.Dataframe()
+    output:
+    sample_names = list, list of strings
+    """
+    sample_names = []
+    for column in protein_groups_dataframe.columns.str.split(" "):
+        if "iBAQ" == column[0] and len(column) > 1:
+            sample_name = column[1].split("_")[0]
+            if not sample_name in sample_names:
+                sample_names.append(sample_name)
+    return sample_names
+
+
+def summing_protein_abundances(protein_abundances):
+    """
+    For the sample, add the protein abundances per fraction together for each protein.
+    input:
+    protein_abundances = pd.Series()
+    output:
+    sample_protein_abundances = pd.Series(), the summed protein abundances for the given sample where the value corresponds to the index of the main dataframe
+    """
+    return pd.Series.sum(protein_abundances)
+
 
 def fetch_uniprot_annotation_step(gui_object, protein_groups_dataframe, settings_dict):
     """
@@ -973,7 +1026,7 @@ def apply_clustering_step(gui_object, settings_dict, protein_groups_dataframe):
         gui_object.report_status("Step 4, clustering the fractions per sample using hierarchical clustering has been disabled.")
 
     return protein_groups_dataframe
-def dump_to_excel_step(gui_object, protein_groups_dataframe, filtered_groups_dataframe, settings_dict):
+def dump_to_excel_step(gui_object, protein_groups_dataframe, filtered_groups_dataframe, settings_dict, original_column_order):
     """
     write away dataframe to an excel file:
     input:
@@ -984,7 +1037,7 @@ def dump_to_excel_step(gui_object, protein_groups_dataframe, filtered_groups_dat
     None
     """
     if settings_dict["steps_dict"]["make_excel_file_step"] == True:
-        dump_data_to_excel(gui_object, protein_groups_dataframe, filtered_groups_dataframe, settings_dict)
+        dump_data_to_excel(gui_object, protein_groups_dataframe, filtered_groups_dataframe, settings_dict, original_column_order)
     else:
         logging.info("Step 5, writing away the data to an excel file, will not be executed because the user has disabled the step.")
         return
@@ -995,7 +1048,7 @@ if __name__ == "__main__":
     settings_dict = load_json(args.settings_file_path)
     protein_groups_dataframe = read_in_protein_groups_file(args.maxquant_file_path)
 
-    protein_groups_dataframe, filtered_groups_dataframe = filter_dataframe_step(protein_groups_dataframe, settings_dict)
+    protein_groups_dataframe, filtered_groups_dataframe, original_column_order = filter_dataframe_step(protein_groups_dataframe, settings_dict)
 
     protein_groups_dataframe = fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict)
 
@@ -1003,4 +1056,4 @@ if __name__ == "__main__":
 
     protein_groups_dataframe = apply_clustering_step(settings_dict, protein_groups_dataframe)
 
-    dump_to_excel_step(protein_groups_dataframe, filtered_groups_dataframe, settings_dict)
+    dump_to_excel_step(protein_groups_dataframe, filtered_groups_dataframe, settings_dict, original_column_order)
