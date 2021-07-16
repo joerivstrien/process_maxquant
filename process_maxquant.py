@@ -771,14 +771,14 @@ def order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_colum
     output:
     protein_groups_dataframe = pd.DataFrame
     """
-    ordered_columns = list(original_column_order) + list(ordered_columns)
+    original_columns = set(original_column_order).difference(set(ordered_columns))
+    ordered_columns = list(original_columns) + list(ordered_columns)
     for column in protein_groups_dataframe.columns:
-        if not column in ordered_columns:
+        if column in settings_dict["make_excel_file_step"]["identifier_column_names"]:
+            ordered_columns.insert(0, column)
+        elif column not in ordered_columns:
             ordered_columns.append(column)
-    for identifier_column in settings_dict["make_excel_file_step"]["identifier_column_names"]:
-        if identifier_column in ordered_columns:
-            ordered_columns.pop(ordered_columns.index(identifier_column))
-            ordered_columns.insert(0, identifier_column)
+
     protein_groups_dataframe = protein_groups_dataframe.reindex(columns=ordered_columns)
     return protein_groups_dataframe
 
@@ -792,15 +792,18 @@ def get_ordered_sample_columns(complexome_profiling_dataframe):
     """
     ordered_columns = []
     global_cluster_column = "global_clustered"
+    global_total_protein_abundance_column = "global_summed_iBAQ_value"
     sample_names = get_sample_names(complexome_profiling_dataframe)
 
     for sample_name in sample_names:
-        sample_columns = select_columns(complexome_profiling_dataframe.columns, f"iBAQ {sample_name}", "contains")
+        sample_columns = complexome_profiling_dataframe.filter(regex=f"iBAQ {sample_name}_").columns
         ordered_columns.extend(sample_columns)
         ordered_columns.append(f'sample_{sample_name}_clustered')
+        ordered_columns.append(f"{sample_name}_summed_iBAQ_value")
 
     #add global clustering column to the end of the ordered_columns list:
     ordered_columns.append(global_cluster_column)
+    ordered_columns.append(global_total_protein_abundance_column)
     return ordered_columns
 
 def get_sample_positions(column_names):
@@ -814,7 +817,7 @@ def get_sample_positions(column_names):
     positions = []
     start_position, end_position = 0, 0
     for column_name in column_names:
-        if "iBAQ" in column_name:
+        if "iBAQ " in column_name:
             if start_position == 0:
                 start_position = column_names.index(column_name)
             end_position = column_names.index(column_name)
@@ -906,10 +909,11 @@ def add_protein_abundance_columns(protein_groups_dataframe):
     """
     sample_names = get_sample_names(protein_groups_dataframe)
     for sample_name in sample_names:
-        sample_columns = select_columns(protein_groups_dataframe.columns, [f"iBAQ {sample_name}"], "contains")
+        sample_columns = protein_groups_dataframe.filter(regex=f"iBAQ {sample_name}_").columns
         sample_protein_abundances = protein_groups_dataframe[sample_columns].apply(summing_protein_abundances, axis=1)
         protein_groups_dataframe[f"{sample_name}_summed_iBAQ_value"] = sample_protein_abundances
-    global_protein_abundances = protein_groups_dataframe[[f"{sample_name}_summed_iBAQ_value" for sample_name in sample_names]].apply(summing_protein_abundances, axis=1)
+    protein_abundance_sample_columns = [f"{sample_name}_summed_iBAQ_value" for sample_name in sample_names]
+    global_protein_abundances = protein_groups_dataframe[protein_abundance_sample_columns].apply(summing_protein_abundances, axis=1)
     protein_groups_dataframe["global_summed_iBAQ_value"] = global_protein_abundances
 
 
