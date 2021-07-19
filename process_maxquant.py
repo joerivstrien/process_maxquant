@@ -291,6 +291,19 @@ def parse_identifier(fasta_header):
         logging.error(f'Parsing a fasta header to get the identifier did not work for header {fasta_header}\nPython error: {error}')
         return np.nan
 
+
+def are_identifiers_not_available(identifiers):
+    """
+    Are all identifiers np.nan or are they strings?
+    input:
+    identifiers = pd.Series()
+    output:
+    boolean, True == all identifiers are NA, and False == some identifiers are not NA
+    """
+    boolean = identifiers.isna().all()
+    return boolean
+
+
 def fetch_uniprot_annotation(gui_object, identifiers, settings_dict):
     """
     input:
@@ -955,8 +968,11 @@ def fetch_uniprot_annotation_step(gui_object, protein_groups_dataframe, settings
     protein_groups_dataframe = pd.DataFrame()
     """
     if settings_dict["steps_dict"]["uniprot_step"] == True and evaluate_uniprot_settings(settings_dict["uniprot_step"]["uniprot_options"]) == True:
-        protein_data_dict = fetch_uniprot_annotation(gui_object, protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
-        protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
+        if are_identifiers_not_available(protein_groups_dataframe["identifier"]) == False:
+            protein_data_dict = fetch_uniprot_annotation(gui_object, protein_groups_dataframe["identifier"], settings_dict["uniprot_step"])
+            protein_groups_dataframe = append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict, settings_dict["uniprot_step"]["uniprot_options"])
+        else:
+            gui_object.report_status("Uniprot will not be queried because no uniprot identifiers were found in the \'Fasta headers\' column.")
     else:
         if settings_dict["steps_dict"]["uniprot_step"] == False:
             gui_object.report_status("Uniprot will not be queried for information due to the step being disabled")
@@ -974,7 +990,8 @@ def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataf
     protein_groups_dataframe = pd.DataFrame()
     """
     if settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == True and \
-       settings_dict["uniprot_step"]["uniprot_options"]["get_gene_name"] == True and settings_dict["uniprot_step"]["uniprot_options"]["get_organism_name"] == True:
+       settings_dict["uniprot_step"]["uniprot_options"]["get_gene_name"] == True and settings_dict["uniprot_step"]["uniprot_options"]["get_organism_name"] == True and \
+       are_identifiers_not_available(protein_groups_dataframe["identifier"]) == False:
         mitocarta_mouse_dataframe = read_in_excel_file(gui_object, settings_dict["mitocarta_step"]["mitocarta_mouse_ftp_link"], settings_dict["mitocarta_step"]["mouse_sheet_name"])
         mitocarta_human_dataframe = read_in_excel_file(gui_object, settings_dict["mitocarta_step"]["mitocarta_human_ftp_link"], settings_dict["mitocarta_step"]["human_sheet_name"])
         protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_mouse_dataframe,
@@ -993,6 +1010,8 @@ def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataf
             gui_object.report_status("The final dataframe will not be enriched with information from mitocarta because the uniprot step is disabled.\nUniprot is needed to get per protein the gene symbol, the key to find values in uniprot.")
         elif settings_dict["steps_dict"]["mitocarta_step"] == False and settings_dict["steps_dict"]["uniprot_step"] == False:
             gui_object.report_status("The final dataframe will not be enriched with information from mitocarta because the mitocarta and uniprot steps are disabled")
+        elif are_identifiers_not_available(protein_groups_dataframe["identifier"]) == True:
+            gui_object.report_status("Step 2 was skipped because no uniprot identifiers were found in the Fasta header column.\nSo, step 3 is also skipped because the gene name column is unavailable.")
 
     return protein_groups_dataframe
 
