@@ -17,31 +17,7 @@ import scipy.spatial.distance as spd
 import openpyxl
 import xlsxwriter
 
-def get_user_arguments():
-    """
-    Use argparse to get user arguments
-    input:
-    None
-    output:
-    args = argparse object
-    """
-    parser = argparse.ArgumentParser(description="Process maxquant files, please use complete file paths because else errors occur",
-                                     usage="USAGE: [process_maxquant.exe] --maxquant_file_path [maxquant_file_path] --settings_file_path [settings_file_path]")
-    parser.add_argument("--maxquant_file_path", help="The file path to the maxquant file", type=str)
-    parser.add_argument("--settings_file_path", help="The path to the settings dict, should be a json file", type=str)
-    #Test files which are more usefull to have like this instead of having to type them in over and over again:
-    #development_options = [["20190417_Methanop_DDMfull_BLZ2_proteinGroups.txt", "maxquant_settings.json"], ["20200123_Scer_Daniel_NB40_BY4742_DFM6_DFM9_proteinGroups.txt", "maxquant_settings.json"],["--maxquant_file_path", "C:\\Users\\ariel\\Documents\\Bio_informatica_bestanden\\maxquant_project\\pythonProject\\20190115_HEKwt_and_MICS1ko_proteinGroups.txt", "--settings_file_path", "C:\\Users\\ariel\\Documents\\Bio_informatica_bestanden\\maxquant_project\\pythonProject\\maxquant_settings.json"]]
-    #development_arguments = development_options[2]
-
-    #args = parser.parse_args(development_arguments)
-    args = parser.parse_args()
-    #Detect whether none arguments were submitted:
-    if not len(sys.argv) > 1:
-        parser.print_help()
-        sys.exit()
-    return args
-
-
+#Two things I need to do. Firstly, re-examine the description on github. Secondly, write an email to Alfredo and tell him the thing works as expected.
 def check_user_input(gui_object, settings_file_path, maxquant_file_path):
     """
     input:
@@ -1059,17 +1035,4 @@ def dump_to_excel_step(gui_object, protein_groups_dataframe, filtered_groups_dat
         return
 
 if __name__ == "__main__":
-    args = get_user_arguments()
-
-    settings_dict = load_json(args.settings_file_path)
-    protein_groups_dataframe = read_in_protein_groups_file(args.maxquant_file_path)
-
-    protein_groups_dataframe, filtered_groups_dataframe, original_column_order = filter_dataframe_step(protein_groups_dataframe, settings_dict)
-
-    protein_groups_dataframe = fetch_uniprot_annotation_step(protein_groups_dataframe, settings_dict)
-
-    protein_groups_dataframe = is_protein_in_mitocarta_step(settings_dict, protein_groups_dataframe)
-
-    protein_groups_dataframe = apply_clustering_step(settings_dict, protein_groups_dataframe)
-
-    dump_to_excel_step(protein_groups_dataframe, filtered_groups_dataframe, settings_dict, original_column_order)
+    print("This script cannot be accessed directly, but should be called by 'gui_file_acceptor.py'.")

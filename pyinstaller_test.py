@@ -5,7 +5,7 @@ workdir = os.getcwd()
 dist_path = os.path.join(workdir, 'dist')
 print(dist_path)
 PyInstaller.__main__.run([
-    'process_maxquant.py',
+    'gui_file_acceptor.py',
     '--distpath', dist_path,
     '--onefile',
-    '--name', "test_6"])
+    '--name', "gui_test_1"])
