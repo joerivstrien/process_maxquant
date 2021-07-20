@@ -6,7 +6,7 @@ In the second step proteins are queried in batches to uniprot and per protein th
 In the third step each protein is compared with the proteins from the mitocarta 'database' and in a column it is denoted if the protein is present in the human or mouse mitocarta database.
 In the fourth step the different samples are clustered based on hierarchical clustering. Additionally, all samples together (global) are clustered. 
 In the fifth and final step the processed output is written away to an excel file with the 2 different sheets where the first sheet contains the filtered away proteins and the second sheet contains the proteins with information as well as the accompanying complexome profiling data(conditional formatting has been applied on these columns).
-<\p>
+</p>
 <p>
 This program uses a settings file in which the user can disable individual steps, change output behaviour and more. However, it should be noted that this program can easily not work when the input parameters are not as expected. 
 Additionally, whenever the uniprot step is disabled the mitocarta step will also not be executed, because the input for the mitocarta step comes from the uniprot output. 
@@ -14,7 +14,7 @@ Additionally, whenever the uniprot step is disabled the mitocarta step will also
 <h3>Usage</h3>
 In order to use this script you first need to download an executable and user defined settings file (the help file is also nice to have).
 First step, go to the releases web page:
-![Alt text](images/find_releases.png?raw=true "Go to the releases webpage on github")
+![Alt text]((images/find_releases.png?raw=true "Go to the releases webpage on github")
 
 Second step, download from the newest release the executable file and the 'maxquant_settings.json' file. 
 ![Alt text](images/download_this_file.png?raw=true "Download the .exe file and maxquant_settings.json")
