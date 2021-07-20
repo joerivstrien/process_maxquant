@@ -129,7 +129,7 @@ class App(QWidget):
     @pyqtSlot()
     def execute_process_maxquant_script(self):
         self.process_maxquant_button.setEnabled(False)
-        logging.basicConfig(filename="process_maxquant.log", filemode="w", level=logging.DEBUG)
+        logging.basicConfig(filename="process_maxquant_log.log", filemode="w", level=logging.DEBUG)
         if check_user_input(self, self.settings_file_input_field.text(), self.maxquant_file_input_field.text()) == False:
             self.process_maxquant_button.setEnabled(True)
             return

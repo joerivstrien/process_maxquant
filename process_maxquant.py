@@ -448,16 +448,16 @@ def get_uniprot_gene_name(uniprot_data_dict, settings_dict):
                 if list(uniprot_gene_dict.keys())[0] in settings_dict["known_gene_names"]:
                     gene_name = uniprot_data_dict["gene"][0][list(uniprot_gene_dict.keys())[0]]["value"]
                 else:
-                    print(f'A new gene name has been found: {list(uniprot_gene_dict.keys())[0]}. You should add this gene name in {settings_dict["known_gene_names"]}')
+                    logging.debug(f'A new gene name has been found: {list(uniprot_gene_dict.keys())[0]}. You should add this gene name in {settings_dict["known_gene_names"]}')
                     gene_name = uniprot_data_dict["gene"][0][list(uniprot_gene_dict.keys())[0]]["value"]
             elif isinstance(uniprot_gene_dict[list(uniprot_gene_dict.keys())[0]], list):
                 if list(uniprot_gene_dict.keys())[0] in settings_dict["known_gene_names"]:
                     gene_name = uniprot_data_dict["gene"][0][list(uniprot_gene_dict.keys())[0]][0]["value"]
                 else:
-                    print(f'A new gene name has been found: {list(uniprot_gene_dict.keys())[0]}. You should add this gene name in {settings_dict["known_gene_names"]}')
+                    logging.debug(f'A new gene name has been found: {list(uniprot_gene_dict.keys())[0]}. You should add this gene name in {settings_dict["known_gene_names"]}')
                     gene_name = uniprot_data_dict["gene"][0][list(uniprot_gene_dict.keys())[0]][0]["value"]
             else:
-                print(f"In the extract gene name from uniprot output the type {type(uniprot_gene_dict[list(uniprot_gene_dict.keys())[0]])} has been found while it is not expected")
+                logging.debug(f"In the extract gene name from uniprot output the type {type(uniprot_gene_dict[list(uniprot_gene_dict.keys())[0]])} has been found while it is not expected")
     else:
         gene_name = np.nan
     return gene_name
@@ -479,7 +479,7 @@ def get_protein_name(uniprot_data_dict, settings_dict):
                     protein_name = uniprot_data_dict["protein"][uniprot_protein_name]["fullName"]["value"]
                 return protein_name
             else:
-                print(f"A new protein name has been found: {str(uniprot_protein_name)}. You should add this protein name to {settings_dict['known_protein_names']}")
+                logging.debug(f"A new protein name has been found: {str(uniprot_protein_name)}. You should add this protein name to {settings_dict['known_protein_names']}")
                 protein_name = list(uniprot_data_dict["protein"].values()[0])["fullName"]["value"]
     else:
         protein_name = np.nan
@@ -787,7 +787,8 @@ def order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_colum
     original_columns = set(original_column_order).difference(set(ordered_columns))
     ordered_columns = list(original_columns) + list(ordered_columns)
     for column in protein_groups_dataframe.columns:
-        if column in settings_dict["make_excel_file_step"]["identifier_column_names"]:
+        if column in settings_dict["make_excel_file_step"]["identifier_column_names"] and column in ordered_columns:
+            ordered_columns.remove(column)
             ordered_columns.insert(0, column)
         elif column not in ordered_columns:
             ordered_columns.append(column)
@@ -938,12 +939,11 @@ def get_sample_names(protein_groups_dataframe):
     output:
     sample_names = list, list of strings
     """
-    sample_names = []
-    for column in protein_groups_dataframe.columns.str.split(" "):
-        if "iBAQ" == column[0] and len(column) > 1:
-            sample_name = column[1].split("_")[0]
-            if not sample_name in sample_names:
-                sample_names.append(sample_name)
+    all_sample_columns = protein_groups_dataframe.columns.str.contains(pat="^iBAQ ", case=True, na=False, regex=True)
+    sample_names_with_fraction_ids = protein_groups_dataframe.columns[all_sample_columns].str.replace(pat="^iBAQ ", repl="", case=True, regex=True)
+    sample_names = sample_names_with_fraction_ids.str.replace(pat="_[$0-9]{2}", repl="", case=True, regex=True)
+    sample_names = set(sample_names.tolist())
+
     return sample_names
 
 
@@ -1026,17 +1026,15 @@ def apply_clustering_step(gui_object, settings_dict, protein_groups_dataframe):
     """
     if settings_dict["steps_dict"]["clustering_step"] == True:
         gui_object.report_status("Step 4, cluster the fractions per sample using hierarchical clustering.")
+        sample_names = get_sample_names(protein_groups_dataframe)
 
-        sample_names = list(set([column[1].split("_")[0] for column in protein_groups_dataframe.columns.str.split(" ") if column[0] == "iBAQ" and len(column) > 1]))
         for sample_name in sample_names:
             logging.info(f"Start hierarchical clustering for sample {sample_name}")
-            #TODO, check whether this regex to detect sample columns is always correct.
-            sample_specific_dataframe = pd.DataFrame(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains(pat=f"iBAQ {sample_name}_[0-9]{2}", regex=True)]], dtype="float64")
+            sample_specific_dataframe = pd.DataFrame(protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains(pat=f"iBAQ {sample_name}", regex=True)]], dtype="float64")
             order_mapping, clustered = cluster_reorder(gui_object, sample_specific_dataframe, settings_dict["clustering_step"]["method"], settings_dict["clustering_step"]["metric"])
             protein_groups_dataframe[f'sample_{sample_name}_clustered'] = pd.Series(order_mapping)
             logging.info(f"Finished hierarchical clustering for sample {sample_name}")
         logging.info("Start hierarchical clustering for all samples")
-        #TODO, write a regex taht is able to detect all the sample columns
         global_order_mapping, global_clustered = cluster_reorder(gui_object, protein_groups_dataframe[protein_groups_dataframe.columns[protein_groups_dataframe.columns.to_series().str.contains("iBAQ ")]])
         protein_groups_dataframe['global_clustered'] = pd.Series(global_order_mapping)
         gui_object.report_status("Step 4, finished clustering the fractions per sample using hierarchical clustering.")
