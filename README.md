@@ -14,22 +14,22 @@ Additionally, whenever the uniprot step is disabled the mitocarta step will also
 <h3>Usage</h3>
 In order to use this script you first need to download an executable and user defined settings file (the help file is also nice to have).
 First step, go to the releases web page:
-![Alt text]((images/find_releases.png?raw=true "Go to the releases webpage on github")
+![Alt text](images/find_releases.png?raw=true "Go to the releases webpage on github")
 
 Second step, download from the newest release the executable file and the 'maxquant_settings.json' file. 
-![Alt text]((images/download_this_file.png?raw=true "Download the .exe file and maxquant_settings.json")
+![Alt text](images/download_this_file.png?raw=true "Download the .exe file and maxquant_settings.json")
 
 Once you have downloaded the executable and settings file place them in a folder of your choosing. 
 This folder should contain (1) the maxquant file you wish to process, (2) the settings file and (3) the executable. 
 Now is a good moment to open the settings file and based on the description of the user defined parameters down below change parameters to change the behaviour of how the maxquant output is processed.  
 An example setup: 
-![Alt text]((images/example_folder_structure.png?raw=true "An example folder structure")
+![Alt text](images/example_folder_structure.png?raw=true "An example folder structure")
 
 Now the program is ready to run. Start the program by executing the executable which will start a shell script and after 1 second a Graphical User Interface (GUI) will appear. 
 In order to run the program it needs the settings file and maxquant file. These two files do not have to be in the same folder as the executable. 
 Anyway, you can select the maxquant output file by clicking 'Select maxquant file' which will open a file selection menu where you can select the file. The file path to the maxquant file is put in the textbox above the 'Select maxquant file' button. 
 The settings file is selected in a similar way as the maxquant file, but you should select the maxquant file by clicking 'Select the settings file' button. 
-![Alt text]((images/file_selection_procedure.png?raw=true "An example folder structure")
+![Alt text](images/file_selection_procedure.png?raw=true "An example folder structure")
 
 When both files have been selected the program can be execute by clicking 'Process maxquant'. The GUI will print status messages and error messages whenever something goes wrong. 
 
