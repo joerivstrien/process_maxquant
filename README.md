@@ -13,8 +13,7 @@ Additionally, whenever the uniprot step is disabled the mitocarta step will also
 </p>
 <h3>Usage</h3>
 In order to use this script you first need to download an executable and user defined settings file (the help file is also nice to have).
-First step, go to the releases web page.
-![Alt text](images/download_this_file.png?raw=true "Download the .exe file and maxquant_settings.json")
+First step, go to the releases web page.  
 ![Alt text](images/find_releases.png?raw=true "Go to the releases webpage on github")
 
 Second step, download from the newest release the executable file and the 'maxquant_settings.json' file. 
