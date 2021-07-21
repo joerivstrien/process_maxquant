@@ -78,7 +78,7 @@ When both files have been selected the program can be execute by clicking 'Proce
 
 5. clustering_step -> parameters for clustering the complexome profiling samples
    1. method -> method for how the clustering is performed. Possible options are: 'single', 'complete', 'average', 'weighted', 'centroid', 'median' or 'ward'.
-   2. metric -> which distance metric should be used. Possible distance metrics are: braycurtis’, ‘canberra’, ‘chebyshev’, ‘cityblock’, ‘correlation’, ‘cosine’, ‘dice’, ‘euclidean’, ‘hamming’, ‘jaccard’, ‘jensenshannon’, ‘kulsinski’, ‘mahalanobis’, ‘matching’, ‘minkowski’, ‘rogerstanimoto’, ‘russellrao’, ‘seuclidean’, ‘sokalmichener’, ‘sokalsneath’, ‘sqeuclidean’, ‘yule’.
+   2. metric -> which distance metric should be used. Possible distance metrics are: 'braycurtis', 'canberra', 'chebyshev', 'cityblock', 'correlation', 'cosine', 'dice', 'euclidean', 'hamming', 'jaccard', 'jensenshannon', 'kulsinski', 'mahalanobis', 'matching', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule'.
 
 6. make_excel_file_step -> parameters for writing away the data into an excel file 
    1. excel_file_name -> the name of the excel file. This file name can also be the path  

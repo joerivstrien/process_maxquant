@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QGroupBo
 from PyQt5.QtCore import pyqtSlot, QProcess
 
 from process_maxquant import check_user_input
+from process_maxquant import validate_user_parameters
 from process_maxquant import load_json
 from process_maxquant import read_in_protein_groups_file
 from process_maxquant import filter_dataframe_step
@@ -129,6 +130,7 @@ class App(QWidget):
     @pyqtSlot()
     def execute_process_maxquant_script(self):
         self.process_maxquant_button.setEnabled(False)
+        self.error_message_label.setText("-")
         logging.basicConfig(filename="process_maxquant_log.log", filemode="w", level=logging.DEBUG)
         if check_user_input(self, self.settings_file_input_field.text(), self.maxquant_file_input_field.text()) == False:
             self.process_maxquant_button.setEnabled(True)
@@ -141,6 +143,11 @@ class App(QWidget):
 
         protein_groups_dataframe, is_maxquant_file_loaded = read_in_protein_groups_file(self, self.maxquant_file_input_field.text())
         if is_maxquant_file_loaded == False:
+            self.process_maxquant_button.setEnabled(True)
+            return
+
+        are_user_parameters_valid = validate_user_parameters(self, settings_dict, protein_groups_dataframe)
+        if are_user_parameters_valid == False:
             self.process_maxquant_button.setEnabled(True)
             return
 

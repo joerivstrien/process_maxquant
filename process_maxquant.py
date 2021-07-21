@@ -95,6 +95,155 @@ def load_json(gui_object, json_filepath):
     return json_object, True
 
 
+def validate_user_parameters(gui_object, settings_dict, protein_groups_dataframe):
+    """
+    Validate whether the user parameters are valid.
+    input:
+    gui_object = PyQt5 Qapplication
+    settings_dict = dict{parameter: [values]}
+    protein_groups_dataframe = pd.Dataframe()
+    output:
+    boolean, True == the user parameters are not valid and False == the user parameters are valid
+    """
+    if is_input_parameter_valid(gui_object, dict, settings_dict["steps_dict"], "steps_dict") == False: return False
+    if are_values_true_or_false(settings_dict["steps_dict"], gui_object) == False: return False
+    if is_input_parameter_valid(gui_object, dict, settings_dict["uniprot_step"]["uniprot_options"], "uniprot_options") == False: return False
+    if are_values_true_or_false(settings_dict["uniprot_step"]["uniprot_options"], gui_object) == False: return False
+    if is_input_parameter_valid(gui_object, list, settings_dict["filtering_step"]["EXACT_MATCHES"], "EXACT_MATCHES") == False: return False
+    if are_columns_in_data(settings_dict["filtering_step"]["EXACT_MATCHES"], protein_groups_dataframe, gui_object) == False: return False
+    if is_input_parameter_valid(gui_object, int, settings_dict["uniprot_step"]["request_idle_time"], "request_idle_time") == False: return False
+    if is_request_idle_time_valid(settings_dict["uniprot_step"]["request_idle_time"], gui_object) == False: return False
+    if is_input_parameter_valid(gui_object, int, settings_dict["uniprot_step"]["batch_amount"], "batch_amount") == False: return False
+    if is_batch_amount_valid(settings_dict["uniprot_step"]["batch_amount"], gui_object) == False: return False
+    if is_input_parameter_valid(gui_object, str, settings_dict["clustering_step"]["method"], "method") == False: return False
+    if is_clustering_method_valid(settings_dict["clustering_step"]["method"], gui_object) == False: return False
+    if is_input_parameter_valid(gui_object, str, settings_dict["clustering_step"]["metric"], "metric") == False: return False
+    if is_clustering_metric_valid(settings_dict["clustering_step"]["metric"], gui_object) == False: return False
+    if is_input_parameter_valid(gui_object, str, settings_dict["make_excel_file_step"]["excel_file_name"], "excel_file_name") == False: return False
+    if is_excel_directory_valid(settings_dict["make_excel_file_step"]["excel_file_name"], gui_object) == False: return False
+    return True
+
+
+def is_input_parameter_valid(gui_object, assumed_input_type, input_parameter, parameter_name):
+    """
+    Check whether the assumed input type is valid.
+    input:
+    gui_object = PyQt5, Qapplication
+    assumed_input_type = type
+    input_parameter = parameter
+    output:
+    boolean, True == assumed input type is actual input type and False == assumed input type is not actual input type
+    """
+    if isinstance(input_parameter, assumed_input_type):
+        return True
+    gui_object.report_error(gui_object, f"The assumed input type {input_parameter} for parameter {parameter_name} is not the actual input type.\n"
+                                        f"Make sure that the settings file has the assumed input parameter for parameter {parameter_name}.")
+    return False
+
+
+def are_values_true_or_false(boolean_dict, gui_object):
+    """
+    Check whether the values are booleans and not something else
+    input:
+    boolean_dict = dict{key : value}
+    output:
+    boolean, True == all values are booleans and False == not all values are booleans
+    """
+    for key, value in boolean_dict.items():
+        if not isinstance(value, (bool, int)):
+            gui_object.report_error(f"The key {key} with value {value} should be 0 to disable the option or 1 to enable the option, not {value}.")
+            return False
+    return True
+
+
+def are_columns_in_data(list_of_column_names, dataframe, gui_object):
+    """
+    Check whether the user defined column names are present in the dataframe
+    input:
+    list_of_column_names = list, list of strings
+    dataframe = pd.Dataframe()
+    output:
+    boolean, True == column names are present in dataframe and False == column names are not present in dataframe
+    """
+    for column in list_of_column_names:
+        if column not in dataframe.columns:
+            gui_object.report_error(f"The column name {column} is not found in the main dataframe.\nCheck whether the name is written correctly.")
+            return False
+    return True
+
+
+def is_request_idle_time_valid(request_idle_time, gui_object):
+    """
+    input:
+    request_idle_time = int
+    output:
+    boolean, True == request_idle_time is valid and False == request_idle_time is not valid
+    """
+    if request_idle_time > 1:
+        return True
+    gui_object.report_error(f"The request_idle_time is {request_idle_time}, but it should be bigger than 1 to prevent being blacklisted by uniprot")
+    return False
+
+
+def is_batch_amount_valid(batch_amount, gui_object):
+    """
+    The batch amount should be greater than 0(1 is valid) and smaller than 100.
+    input:
+    batch_amount = int
+    output:
+    boolean, True == batch_amount is valid and False == batch_amount is not valid
+    """
+    if batch_amount < 1:
+        gui_object.report_error(f"Currently the batch amount is {batch_amount} while it should be greater than 0")
+        return False
+    elif batch_amount > 100:
+        gui_object.report_error(f"Currently the batch amount is {batch_amount} while it should be less or equal to 100")
+        return False
+    return True
+
+
+def is_clustering_method_valid(clustering_method, gui_object):
+    """
+    input:
+    clustering_method = string
+    output:
+    boolean, True == clustering_method is a valid clustering method and False == clustering_method is an invalid clustering method
+    """
+    valid_clustering_methods = ['single', 'complete', 'average', 'weighted', 'centroid', 'median', 'ward']
+    if clustering_method not in valid_clustering_methods:
+        gui_object.report_error(f"The submitted clustering method {clustering_method} is not among the clustering methods:\n{*valid_clustering_methods,}")
+        return False
+    return True
+
+
+def is_clustering_metric_valid(clustering_metric, gui_object):
+    """
+    input:
+    clustering_metric = string
+    output:
+    boolean, True == clustering_metric is a valid clustering metric and False == clustering_metric is an invalid clustering metric
+    """
+    valid_clustering_metrics = ['braycurtis', 'canberra', 'chebyshev', 'cityblock', 'correlation', 'cosine', 'dice', 'euclidean', 'hamming', 'jaccard', 'jensenshannon', 'kulsinski', 'mahalanobis', 'matching', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']
+    if clustering_metric not in valid_clustering_metrics:
+        gui_object.report_error(f"The submitted clustering method {clustering_metric} is not among the clustering methods:\n{*valid_clustering_metrics,}")
+        return False
+    return True
+
+
+def is_excel_directory_valid(output_location, gui_object):
+    """
+    Is the excel file written to a valid directory?
+    input:
+    output_location = string
+    output:
+    boolean, True == the output is a valid directory and False == the output is an invalid directory
+    """
+    if os.path.exists(output_location) == False:
+        gui_object.report_error(f"The excel file location {output_location} doesn't appear to exist.")
+        return False
+    return True
+
+
 def read_in_protein_groups_file(gui_object, filename):
     """
     input:
@@ -965,6 +1114,8 @@ def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataf
     output:
     protein_groups_dataframe = pd.DataFrame()
     """
+    # TODO, Check whether the mitocarta column names are validated.
+    # TODO, Check whether the mitocarta organism is even in the mitocarta database, if not, tell the user.
     if settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == True and \
        settings_dict["uniprot_step"]["uniprot_options"]["get_gene_name"] == True and settings_dict["uniprot_step"]["uniprot_options"]["get_organism_name"] == True and \
        are_identifiers_not_available(protein_groups_dataframe["identifier"]) == False:
