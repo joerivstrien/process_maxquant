@@ -1114,13 +1114,22 @@ def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataf
     output:
     protein_groups_dataframe = pd.DataFrame()
     """
-    # TODO, Check whether the mitocarta column names are validated.
-    # TODO, Check whether the mitocarta organism is even in the mitocarta database, if not, tell the user.
     if settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == True and \
        settings_dict["uniprot_step"]["uniprot_options"]["get_gene_name"] == True and settings_dict["uniprot_step"]["uniprot_options"]["get_organism_name"] == True and \
        are_identifiers_not_available(protein_groups_dataframe["identifier"]) == False:
         mitocarta_mouse_dataframe = read_in_excel_file(gui_object, settings_dict["mitocarta_step"]["mitocarta_mouse_ftp_link"], settings_dict["mitocarta_step"]["mouse_sheet_name"])
         mitocarta_human_dataframe = read_in_excel_file(gui_object, settings_dict["mitocarta_step"]["mitocarta_human_ftp_link"], settings_dict["mitocarta_step"]["human_sheet_name"])
+        if validate_mitocarta_input(gui_object, mitocarta_mouse_dataframe,
+                                 settings_dict["mitocarta_step"]["mitocarta_symbol_column"],
+                                 settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"], "Mouse") == False:
+            return None, False
+        if validate_mitocarta_input(gui_object, mitocarta_mouse_dataframe,
+                                 settings_dict["mitocarta_step"]["mitocarta_symbol_column"],
+                                 settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"], "Human") == False:
+            return None, False
+        is_organism_present(gui_object, protein_groups_dataframe, settings_dict["mitocarta_step"]["mitocarta_mouse_organism"])
+        is_organism_present(gui_object, protein_groups_dataframe, settings_dict["mitocarta_step"]["mitocarta_human_organism"])
+
         protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_mouse_dataframe,
                                                            settings_dict["mitocarta_step"]["mitocarta_mouse_organism"], "mitocarta_mouse_presency",
                                                            settings_dict["mitocarta_step"]["mitocarta_symbol_column"], settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"])
@@ -1140,7 +1149,44 @@ def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataf
         elif are_identifiers_not_available(protein_groups_dataframe["identifier"]) == True:
             gui_object.report_status("Step 2 was skipped because no uniprot identifiers were found in the Fasta header column.\nSo, step 3 is also skipped because the gene name column is unavailable.")
 
-    return protein_groups_dataframe
+    return protein_groups_dataframe, True
+
+def validate_mitocarta_input(gui_object, mitocarta_dataframe, mitocarta_symbol_column, additional_mitocarata_column, mitocarta_db_organism):
+    """
+    Validate whether the mitocarta_column names from the user exist and whether the organism is found in the mitocarta database
+    input:
+    gui_object = PyQt5, Qapplication
+    mitocarta_mouse_dataframe = pd.Dataframe()
+    mitocarta_symbol_column = string
+    additionaly_mitocarata_column = string
+    mitocarta_db_organism = string
+    mitocarta_organism = string
+    output:
+    boolean, True == the organism and columns are present in mitocarata and False == the organism or columns are not present in mitocarta
+    """
+    if not mitocarta_symbol_column in mitocarta_dataframe:
+        gui_object.report_error(f"The {mitocarta_symbol_column} is not present in the {mitocarta_db_organism} mitocarta database")
+        return False
+    elif not additional_mitocarata_column in mitocarta_dataframe:
+        gui_object.report_error(f"The {additional_mitocarata_column} is not present in the {mitocarta_db_organism} mitocarta database")
+        return False
+    return True
+
+
+def is_organism_present(gui_object, protein_groups_dataframe, mitocarta_organism):
+    """
+    Check whether the user defined organism is even present in the dataframe
+    input:
+    gui_object = PyQt5, Qapplication
+    protein_groups_dataframe = pd.Dataframe()
+    mitocarta_organism = string
+    output:
+    None
+    """
+    if not mitocarta_organism in protein_groups_dataframe["organism_name"]:
+        gui_object.report_error(f"Warning: the organism {mitocarta_organism} is not present in the main dataframe.\n"
+                                f"The result will be that none of the proteins are present in mitocarta.")
+
 
 def apply_clustering_step(gui_object, settings_dict, protein_groups_dataframe):
     """

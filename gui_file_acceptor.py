@@ -155,7 +155,10 @@ class App(QWidget):
                                                                                     settings_dict)
         protein_groups_dataframe = fetch_uniprot_annotation_step(self, protein_groups_dataframe, settings_dict)
 
-        protein_groups_dataframe = is_protein_in_mitocarta_step(self, settings_dict, protein_groups_dataframe)
+        protein_groups_dataframe, are_mitocarta_columns_present = is_protein_in_mitocarta_step(self, settings_dict, protein_groups_dataframe)
+        if are_mitocarta_columns_present == False:
+            self.process_maxquant_button.setEnabled(True)
+            return
 
         protein_groups_dataframe = apply_clustering_step(self, settings_dict, protein_groups_dataframe)
 
