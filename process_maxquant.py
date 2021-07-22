@@ -449,9 +449,8 @@ def fetch_uniprot_annotation(gui_object, identifiers, settings_dict):
         gui_object.report_status(f"Start fetching uniprot data for batch number {n_batch + 1} of the total {len(identifier_batches)} batches")
         requestURL = settings_dict["uniprot_base_url"]+settings_dict["uniprot_request_url"]+",".join(identifiers_batch)
         request = requests.get(requestURL, headers={"Accept" : "application/json"})
-        if not request.ok:
-            logging.error(f"Something went wrong with query {n_batch} while querying the uniprot database. The {len(identifiers)} proteins of this batch will be ignored")
-            request.raise_for_status()
+        if request.ok == False:
+            gui_object.report_error(f"Something went wrong with batch {n_batch} of {len(identifier_batches)} batches while querying the uniprot database. The {len(identifiers_batch)} proteins of this batch will be ignored")
             for identifier in identifiers_batch:
                 protein_data_dict[identifier] = {"gene_name":np.nan, "protein_name":np.nan, "organism_name":np.nan, "hyperlink":np.nan, "cell_compartment":np.nan, "string_linkout":np.nan}
         else:
@@ -733,8 +732,8 @@ def append_uniprot_data_to_dataframe(protein_groups_dataframe, protein_data_dict
     protein_groups_dataframe = pd.DataFrame
     """
     logging.info("Start adding the uniprot columns to the existing dataframe")
-
     uniprot_column_names = get_column_names(uniprot_options_dict)
+
     for uniprot_column_name in uniprot_column_names:
         uniprot_column_values = get_uniprot_column_values(protein_groups_dataframe["identifier"], uniprot_column_name, protein_data_dict)
         protein_groups_dataframe[uniprot_column_name] = uniprot_column_values
@@ -776,8 +775,11 @@ def get_uniprot_column_values(identifiers, uniprot_column_name, protein_data_dic
     """
     uniprot_column_values = []
     for identifier in identifiers:
-        uniprot_column_value = protein_data_dict[identifier][uniprot_column_name]
-        uniprot_column_values.append(uniprot_column_value)
+        if uniprot_column_name in protein_data_dict[identifier]:
+            uniprot_column_value = protein_data_dict[identifier][uniprot_column_name]
+            uniprot_column_values.append(uniprot_column_value)
+        else:
+            uniprot_column_values.append(np.nan)
     return uniprot_column_values
 def evaluate_uniprot_settings(uniprot_options):
     """
@@ -1165,10 +1167,10 @@ def validate_mitocarta_input(gui_object, mitocarta_dataframe, mitocarta_symbol_c
     boolean, True == the organism and columns are present in mitocarata and False == the organism or columns are not present in mitocarta
     """
     if not mitocarta_symbol_column in mitocarta_dataframe:
-        gui_object.report_error(f"The {mitocarta_symbol_column} is not present in the {mitocarta_db_organism} mitocarta database")
+        gui_object.report_error(f"The column {mitocarta_symbol_column} is not present in the {mitocarta_db_organism} mitocarta database")
         return False
     elif not additional_mitocarata_column in mitocarta_dataframe:
-        gui_object.report_error(f"The {additional_mitocarata_column} is not present in the {mitocarta_db_organism} mitocarta database")
+        gui_object.report_error(f"The column {additional_mitocarata_column} is not present in the {mitocarta_db_organism} mitocarta database")
         return False
     return True
 
