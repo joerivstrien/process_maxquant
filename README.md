@@ -1,6 +1,6 @@
 <h3>Description</h3>
 <p>
-This repository serves as a storage place for code and an executable to process the output from maxquant used for complexome profiling experiments. The maxquant file is processed in 5 steps. 
+This repository serves to store code and an executable for Windows to process the output from maxquant for complexome profiling experiments. The maxquant file is processed in 5 steps. 
 In the first step unwanted columns are removed and proteins not of interest (these proteins contain the words "REV" or "CON" in the 'Majority protein IDs' column) are filtered away. 
 In the second step proteins are queried in batches to uniprot and per protein the gene name, protein name, organism name, the cell compartment, a uniprot specific protein hyperlink and a hyperlink to the string database are retrieved if they are available. The user can specify which elements should be retrieved from uniprot. 
 In the third step each protein is compared with the proteins from the mitocarta 'database' and in a column it is denoted if the protein is present in the human or mouse mitocarta database.
@@ -8,30 +8,30 @@ In the fourth step the different samples are clustered based on hierarchical clu
 In the fifth and final step the processed output is written away to an excel file with the 2 different sheets where the first sheet contains the filtered away proteins and the second sheet contains the proteins with information as well as the accompanying complexome profiling data(conditional formatting has been applied on these columns).
 </p>
 <p>
-This program uses a settings file in which the user can disable individual steps, change output behaviour and more. However, it should be noted that this program can easily not work when the input parameters are not as expected. 
-Additionally, whenever the uniprot step is disabled the mitocarta step will also not be executed, because the input for the mitocarta step comes from the uniprot output. 
+This program uses a settings file in which the user can disable individual steps, change output behaviour and more. Whenever the user enters invalid parameters the program will halt and show an error message. 
+Lastly, whenever the uniprot step is disabled the mitocarta step will also not be executed, because the input for the mitocarta step comes from the uniprot output. 
 </p>
 <h3>Usage</h3>
-In order to use this script you first need to download an executable and user defined settings file (the help file is also nice to have).
+In order to run the executable you first need to download the executable and user defined settings file.
 First step, go to the releases web page. 
 ![Alt text](images/find_releases.png?raw=true "Go to the releases webpage on github")
 
-Second step, download from the newest release the executable file and the 'maxquant_settings.json' file. 
+Second step, download the executable file from the newest release and the 'maxquant_settings.json' file. 
 ![Alt text](images/download_this_file.png?raw=true "Download the .exe file and maxquant_settings.json")
 
-Once you have downloaded the executable and settings file place them in a folder of your choosing. 
+Once you have downloaded the executable and settings file place them together in a folder. 
 This folder should contain (1) the maxquant file you wish to process, (2) the settings file and (3) the executable. 
-Now is a good moment to open the settings file and based on the description of the user defined parameters down below change parameters to change the behaviour of how the maxquant output is processed.  
+Now is a good moment to open the settings file and based on the description of the user defined parameters down below change parameters in order to change the behaviour of how the maxquant output is processed.
 An example setup: 
 ![Alt text](images/example_folder_structure.png?raw=true "An example folder structure")
 
 Now the program is ready to run. Start the program by executing the executable which will start a shell script and after 1 second a Graphical User Interface (GUI) will appear. 
-In order to run the program it needs the settings file and maxquant file. These two files do not have to be in the same folder as the executable. 
-Anyway, you can select the maxquant output file by clicking 'Select maxquant file' which will open a file selection menu where you can select the file. The file path to the maxquant file is put in the textbox above the 'Select maxquant file' button. 
+In order to run the program it needs the settings file and maxquant file. You can select the maxquant output file by clicking 'Select maxquant file' which will open a file selection menu 
+where you can select the file. The file path to the maxquant file is put in the textbox above the 'Select maxquant file' button. 
 The settings file is selected in a similar way as the maxquant file, but you should select the maxquant file by clicking 'Select the settings file' button. 
 ![Alt text](images/file_selection_procedure.png?raw=true "An example folder structure")
 
-When both files have been selected the program can be execute by clicking 'Process maxquant'. The GUI will print status messages and error messages whenever something goes wrong. 
+When both files have been selected the program can be execute by clicking 'Process maxquant'. The GUI will inform you through status messages and whenever something goes wrong an error message will appear. 
 
 <h4>User defined parameters:</h4>
 1. steps_dict -> which steps would you like to execute? 1 means that the step is executed and 0 means the step is not executed. These parameters shouldn't be anything else than 1 or 0. 
@@ -87,4 +87,4 @@ When both files have been selected the program can be execute by clicking 'Proce
 <h3>Authors</h3>
 Ariel Komen and Joeri van Strien
 <h3>Requirements</h3>
-The requirements can be found in a separate requirements file. 
+For programmers who want to add something to the script the requirements to run this program in a virtual environment can be found in a separate requirements file. 
