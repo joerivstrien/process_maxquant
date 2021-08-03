@@ -1,19 +1,17 @@
 #Import standard python libraries:
 import logging
 import os.path
-import sys
 import requests
 import time
 import re
 import json
-import argparse
 import urllib.parse
 import urllib.request
 #Import third-part libraries
 import pandas as pd
 import numpy as np
-import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as spd
+import fastcluster as fastcluster
 import openpyxl
 import xlsxwriter
 
@@ -843,10 +841,17 @@ def cluster_reorder(gui_object, sample_specific_dataframe, method = 'average', m
     """
     try:
         condensed_distance_matrix = spd.pdist(np.array(sample_specific_dataframe))
+        clustered = fastcluster.linkage(condensed_distance_matrix, method=method, metric=metric)
 
-        clustered = sch.linkage(condensed_distance_matrix, method=method, metric=metric, optimal_ordering=True)
-        dendrogram = sch.dendrogram(clustered, labels=sample_specific_dataframe.index.values, orientation='right', no_plot=True)
-        ordered_index = sample_specific_dataframe.iloc[dendrogram['leaves'],:].index.values
+        n = len(clustered) + 1
+        cache = dict()
+        for k in range(len(clustered)):
+            c1, c2 = int(clustered[k][0]), int(clustered[k][1])
+            c1 = [c1] if c1 < n else cache.pop(c1)
+            c2 = [c2] if c2 < n else cache.pop(c2)
+            cache[n + k] = c1 + c2
+        ordered_index = cache[2 * len(clustered)]
+
         order = {label: index_x for index_x, label in enumerate(ordered_index)}
         return order, clustered
     except Exception as error:
