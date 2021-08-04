@@ -15,7 +15,7 @@ import fastcluster as fastcluster
 import openpyxl
 import xlsxwriter
 
-#Two things I need to do. Firstly, re-examine the description on github. Secondly, write an email to Alfredo and tell him the thing works as expected.
+
 def check_user_input(gui_object, settings_file_path, maxquant_file_path):
     """
     input:
@@ -236,9 +236,11 @@ def is_excel_directory_valid(output_location, gui_object):
     output:
     boolean, True == the output is a valid directory and False == the output is an invalid directory
     """
-    if os.path.exists(output_location) == False:
-        gui_object.report_error(f"The excel file location {output_location} doesn't appear to exist.")
-        return False
+    directory, file_name = os.path.split(output_location)
+    if not "" == directory:
+        if not os.path.isdir(directory):
+            gui_object.report_error(f"The excel file location {output_location} doesn't appear to exist.")
+            return False
     return True
 
 

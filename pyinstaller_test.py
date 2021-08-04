@@ -8,4 +8,4 @@ PyInstaller.__main__.run([
     'gui_file_acceptor.py',
     '--distpath', dist_path,
     '--onefile',
-    '--name', "gui_test_1"])
+    '--name', "process_maxquant_executable_with_gui_2"])

@@ -81,8 +81,8 @@ When both files have been selected the program can be execute by clicking 'Proce
    2. metric -> which distance metric should be used. Possible distance metrics are: 'braycurtis', 'canberra', 'chebyshev', 'cityblock', 'correlation', 'cosine', 'dice', 'euclidean', 'hamming', 'jaccard', 'jensenshannon', 'kulsinski', 'mahalanobis', 'matching', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule'.
 
 6. make_excel_file_step -> parameters for writing away the data into an excel file 
-   1. excel_file_name -> the name of the excel file. This file name can also be the path  
-   2. identifier_column_names -> 
+   1. excel_file_name -> You can define the name of the excel file or write out an absolute path to a desired location.
+   2. identifier_column_names -> which columns should the excel file start with? 
 
 <h3>Authors</h3>
 Ariel Komen and Joeri van Strien
