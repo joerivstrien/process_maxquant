@@ -113,6 +113,8 @@ def validate_user_parameters(gui_object, settings_dict, protein_groups_dataframe
     if is_request_idle_time_valid(settings_dict["uniprot_step"]["request_idle_time"], gui_object) == False: return False
     if is_input_parameter_valid(gui_object, int, settings_dict["uniprot_step"]["batch_amount"], "batch_amount") == False: return False
     if is_batch_amount_valid(settings_dict["uniprot_step"]["batch_amount"], gui_object) == False: return False
+    if is_input_parameter_valid(gui_object, int, settings_dict["mitocarta_step"]["evaluate_symbol_column"], "evaluate_symbol_column") == False: return False
+    if is_input_parameter_valid(gui_object, int, settings_dict["mitocarta_step"]["evaluate_additional_symbol_column"], "evaluate_additional_symbol_column") == False: return False
     if is_input_parameter_valid(gui_object, str, settings_dict["clustering_step"]["method"], "method") == False: return False
     if is_clustering_method_valid(settings_dict["clustering_step"]["method"], gui_object) == False: return False
     if is_input_parameter_valid(gui_object, str, settings_dict["clustering_step"]["metric"], "metric") == False: return False
@@ -791,7 +793,8 @@ def evaluate_uniprot_settings(uniprot_options):
     """
     return any(uniprot_options.values())
 
-def is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_species_dataframe, species_name, new_column_name, symbol_column, additional_symbol_column):
+def is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_species_dataframe, species_name,
+                            new_column_name, symbol_column, additional_symbol_column, use_symbol_column, use_additional_symbol_column):
     """
     input:
     gui_object = PyQt5, Qapplication
@@ -805,18 +808,25 @@ def is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_spec
     protein_groups_dataframe = pd.DataFrame()
     """
     gui_object.report_status(f"Start elucidating which proteins are present in the {species_name} mitocarta dataset")
-    protein_groups_dataframe["gene_name"].fillna('', inplace=True)
+    #protein_groups_dataframe["gene_name"].fillna('', inplace=True)
     mitocarta_species_dataframe[additional_symbol_column].fillna('', inplace=True)
     #In the mitocarta_mouse_data there are several synonyms which are not string, in order to remove these I wrote the  following line of code:
     mitocarta_species_dataframe[additional_symbol_column].where(cond=[True if type(x) == str else False for x in mitocarta_species_dataframe[additional_symbol_column].str.split("|")],
                                                   other="-", inplace=True)
     try:
-        organism_rows = protein_groups_dataframe["organism_name"] == species_name
-        symbol_rows = protein_groups_dataframe["gene_name"].isin([symbol for symbol in protein_groups_dataframe["gene_name"]
-                                                                  if mitocarta_species_dataframe[symbol_column].str.contains(symbol).any() == True
-                                                                  or [symbol in series_list for series_list in mitocarta_species_dataframe[additional_symbol_column].str.split("|")]])
+        #organism_rows = protein_groups_dataframe["organism_name"] == species_name
+        if use_symbol_column == True and use_additional_symbol_column == True:
+            symbol_rows = protein_groups_dataframe["gene_name"].isin([symbol for symbol in protein_groups_dataframe["gene_name"] if
+                                                                  mitocarta_species_dataframe[symbol_column].str.contains(symbol, regex=False).any() or
+                                                                  mitocarta_species_dataframe[additional_symbol_column].str.contains(symbol, regex=False).any()])
+        elif use_symbol_column == True and use_additional_symbol_column == False:
+            symbol_rows = protein_groups_dataframe["gene_name"].isin(symbol for symbol in protein_groups_dataframe["gene_name"] if
+                                                                  mitocarta_species_dataframe[symbol_column].str.contains(symbol, regex=False).any())
+        elif use_symbol_column == False and use_additional_symbol_column == True:
+            symbol_rows = protein_groups_dataframe["gene_name"].isin(symbol for symbol in protein_groups_dataframe["gene_name"] if
+                                                                  mitocarta_species_dataframe[additional_symbol_column].str.contains(symbol, regex=False).any())
 
-        presency_index = protein_groups_dataframe.index[(organism_rows) & (symbol_rows)]
+        presency_index = protein_groups_dataframe.index[symbol_rows] #(organism_rows) &
         protein_groups_dataframe[new_column_name] = [1.0 if index in presency_index else 0.0 for index in range(protein_groups_dataframe.shape[0])]
     except IndexError as index_error:
         log_error(gui_object, f"An index error occurred while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored.", index_error)
@@ -1123,28 +1133,32 @@ def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataf
     output:
     protein_groups_dataframe = pd.DataFrame()
     """
-    if settings_dict["steps_dict"]["mitocarta_step"] == True and settings_dict["steps_dict"]["uniprot_step"] == True and \
-       settings_dict["uniprot_step"]["uniprot_options"]["get_gene_name"] == True and settings_dict["uniprot_step"]["uniprot_options"]["get_organism_name"] == True and \
-       are_identifiers_not_available(protein_groups_dataframe["identifier"]) == False:
+    if settings_dict["steps_dict"]["mitocarta_step"] == True and \
+            settings_dict["steps_dict"]["uniprot_step"] == True and \
+            settings_dict["uniprot_step"]["uniprot_options"]["get_gene_name"] == True and \
+            settings_dict["uniprot_step"]["uniprot_options"]["get_organism_name"] == True and \
+            are_identifiers_not_available(protein_groups_dataframe["identifier"]) == False or \
+            (settings_dict["mitocarta_step"]["evaluate_symbol_column"] == False and settings_dict["mitocarta_step"]["evaluate_additional_symbol_column"] == False):
+
         mitocarta_mouse_dataframe = read_in_excel_file(gui_object, settings_dict["mitocarta_step"]["mitocarta_mouse_ftp_link"], settings_dict["mitocarta_step"]["mouse_sheet_name"])
         mitocarta_human_dataframe = read_in_excel_file(gui_object, settings_dict["mitocarta_step"]["mitocarta_human_ftp_link"], settings_dict["mitocarta_step"]["human_sheet_name"])
-        if validate_mitocarta_input(gui_object, mitocarta_mouse_dataframe,
-                                 settings_dict["mitocarta_step"]["mitocarta_symbol_column"],
+        if validate_mitocarta_input(gui_object, mitocarta_mouse_dataframe, settings_dict["mitocarta_step"]["mitocarta_symbol_column"],
                                  settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"], "Mouse") == False:
             return None, False
-        if validate_mitocarta_input(gui_object, mitocarta_mouse_dataframe,
-                                 settings_dict["mitocarta_step"]["mitocarta_symbol_column"],
+        if validate_mitocarta_input(gui_object, mitocarta_mouse_dataframe, settings_dict["mitocarta_step"]["mitocarta_symbol_column"],
                                  settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"], "Human") == False:
             return None, False
-        is_organism_present(gui_object, protein_groups_dataframe, settings_dict["mitocarta_step"]["mitocarta_mouse_organism"])
-        is_organism_present(gui_object, protein_groups_dataframe, settings_dict["mitocarta_step"]["mitocarta_human_organism"])
+        #is_organism_present(gui_object, protein_groups_dataframe, settings_dict["mitocarta_step"]["mitocarta_mouse_organism"])
+        #is_organism_present(gui_object, protein_groups_dataframe, settings_dict["mitocarta_step"]["mitocarta_human_organism"])
 
         protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_mouse_dataframe,
                                                            settings_dict["mitocarta_step"]["mitocarta_mouse_organism"], "mitocarta_mouse_presency",
-                                                           settings_dict["mitocarta_step"]["mitocarta_symbol_column"], settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"])
+                                                           settings_dict["mitocarta_step"]["mitocarta_symbol_column"], settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"],
+                                                           settings_dict["mitocarta_step"]["evaluate_symbol_column"], settings_dict["mitocarta_step"]["evaluate_additional_symbol_column"])
         protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_human_dataframe,
                                                            settings_dict["mitocarta_step"]["mitocarta_human_organism"], "mitocarta_human_presency",
-                                                           settings_dict["mitocarta_step"]["mitocarta_symbol_column"], settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"])
+                                                           settings_dict["mitocarta_step"]["mitocarta_symbol_column"], settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"],
+                                                           settings_dict["mitocarta_step"]["evaluate_symbol_column"], settings_dict["mitocarta_step"]["evaluate_additional_symbol_column"])
 
     else:
         if settings_dict["steps_dict"]["mitocarta_step"] == False and settings_dict["steps_dict"]["uniprot_step"] == True:
@@ -1157,6 +1171,8 @@ def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataf
             gui_object.report_status("The final dataframe will not be enriched with information from mitocarta because the mitocarta and uniprot steps are disabled")
         elif are_identifiers_not_available(protein_groups_dataframe["identifier"]) == True:
             gui_object.report_status("Step 2 was skipped because no uniprot identifiers were found in the Fasta header column.\nSo, step 3 is also skipped because the gene name column is unavailable.")
+        elif settings_dict["mitocarta_step"]["evaluate_symbol_column"] == False and settings_dict["mitocarta_step"]["evaluate_additional_symbol_column"] == False:
+            gui_object.report_status("Step 3 is skipped because both the symbol column and additional_symbol column in the settings file are set to 0.")
 
     return protein_groups_dataframe, True
 
@@ -1192,7 +1208,7 @@ def is_organism_present(gui_object, protein_groups_dataframe, mitocarta_organism
     output:
     None
     """
-    if not mitocarta_organism in protein_groups_dataframe["organism_name"]:
+    if protein_groups_dataframe["organism_name"].isin([mitocarta_organism]).any() == False:
         gui_object.report_error(f"Warning: the organism {mitocarta_organism} is not present in the main dataframe.\n"
                                 f"The result will be that none of the proteins are present in mitocarta.")
 

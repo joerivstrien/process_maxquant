@@ -132,6 +132,7 @@ class App(QWidget):
         self.process_maxquant_button.setEnabled(False)
         self.error_message_label.setText("-")
         logging.basicConfig(filename="process_maxquant_log.log", filemode="w", level=logging.DEBUG)
+
         if check_user_input(self, self.settings_file_input_field.text(), self.maxquant_file_input_field.text()) == False:
             self.process_maxquant_button.setEnabled(True)
             return

@@ -2,8 +2,8 @@
 "steps_dict":
     {
         "filtering_step":1,
-        "uniprot_step":0,
-        "mitocarta_step":0,
+        "uniprot_step":1,
+        "mitocarta_step":1,
         "clustering_step":1,
         "make_excel_file_step":1
     },
@@ -65,6 +65,8 @@
         "mouse_sheet_name":"A Mouse MitoCarta3.0",
 	"mitocarta_symbol_column":"Symbol",
 	"mitocarta_additional_symbol_column":"Synonyms",
+	"evaluate_symbol_column":1,
+	"evaluate_additional_symbol_column":1,
 	"mitocarta_mouse_organism":"Mus musculus",
 	"mitocarta_human_organism":"Homo sapiens"
     },
