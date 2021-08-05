@@ -65,7 +65,7 @@
         "mouse_sheet_name":"A Mouse MitoCarta3.0",
 	"mitocarta_symbol_column":"Symbol",
 	"mitocarta_additional_symbol_column":"Synonyms",
-	"evaluate_symbol_column":1,
+	"evaluate_symbol_column":0,
 	"evaluate_additional_symbol_column":1,
 	"mitocarta_mouse_organism":"Mus musculus",
 	"mitocarta_human_organism":"Homo sapiens"

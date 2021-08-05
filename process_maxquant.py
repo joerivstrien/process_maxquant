@@ -808,13 +808,11 @@ def is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_spec
     protein_groups_dataframe = pd.DataFrame()
     """
     gui_object.report_status(f"Start elucidating which proteins are present in the {species_name} mitocarta dataset")
-    #protein_groups_dataframe["gene_name"].fillna('', inplace=True)
     mitocarta_species_dataframe[additional_symbol_column].fillna('', inplace=True)
     #In the mitocarta_mouse_data there are several synonyms which are not string, in order to remove these I wrote the  following line of code:
     mitocarta_species_dataframe[additional_symbol_column].where(cond=[True if type(x) == str else False for x in mitocarta_species_dataframe[additional_symbol_column].str.split("|")],
                                                   other="-", inplace=True)
     try:
-        #organism_rows = protein_groups_dataframe["organism_name"] == species_name
         if use_symbol_column == True and use_additional_symbol_column == True:
             symbol_rows = protein_groups_dataframe["gene_name"].isin([symbol for symbol in protein_groups_dataframe["gene_name"] if
                                                                   mitocarta_species_dataframe[symbol_column].str.contains(symbol, regex=False).any() or
@@ -826,7 +824,7 @@ def is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_spec
             symbol_rows = protein_groups_dataframe["gene_name"].isin(symbol for symbol in protein_groups_dataframe["gene_name"] if
                                                                   mitocarta_species_dataframe[additional_symbol_column].str.contains(symbol, regex=False).any())
 
-        presency_index = protein_groups_dataframe.index[symbol_rows] #(organism_rows) &
+        presency_index = protein_groups_dataframe.index[symbol_rows]
         protein_groups_dataframe[new_column_name] = [1.0 if index in presency_index else 0.0 for index in range(protein_groups_dataframe.shape[0])]
     except IndexError as index_error:
         log_error(gui_object, f"An index error occurred while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored.", index_error)
@@ -1148,8 +1146,6 @@ def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataf
         if validate_mitocarta_input(gui_object, mitocarta_mouse_dataframe, settings_dict["mitocarta_step"]["mitocarta_symbol_column"],
                                  settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"], "Human") == False:
             return None, False
-        #is_organism_present(gui_object, protein_groups_dataframe, settings_dict["mitocarta_step"]["mitocarta_mouse_organism"])
-        #is_organism_present(gui_object, protein_groups_dataframe, settings_dict["mitocarta_step"]["mitocarta_human_organism"])
 
         protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_mouse_dataframe,
                                                            settings_dict["mitocarta_step"]["mitocarta_mouse_organism"], "mitocarta_mouse_presency",
@@ -1196,21 +1192,6 @@ def validate_mitocarta_input(gui_object, mitocarta_dataframe, mitocarta_symbol_c
         gui_object.report_error(f"The column {additional_mitocarata_column} is not present in the {mitocarta_db_organism} mitocarta database")
         return False
     return True
-
-
-def is_organism_present(gui_object, protein_groups_dataframe, mitocarta_organism):
-    """
-    Check whether the user defined organism is even present in the dataframe
-    input:
-    gui_object = PyQt5, Qapplication
-    protein_groups_dataframe = pd.Dataframe()
-    mitocarta_organism = string
-    output:
-    None
-    """
-    if protein_groups_dataframe["organism_name"].isin([mitocarta_organism]).any() == False:
-        gui_object.report_error(f"Warning: the organism {mitocarta_organism} is not present in the main dataframe.\n"
-                                f"The result will be that none of the proteins are present in mitocarta.")
 
 
 def apply_clustering_step(gui_object, settings_dict, protein_groups_dataframe):
