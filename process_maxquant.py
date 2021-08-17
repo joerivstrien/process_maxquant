@@ -809,9 +809,7 @@ def is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_spec
     """
     gui_object.report_status(f"Start elucidating which proteins are present in the {species_name} mitocarta dataset")
     mitocarta_species_dataframe[additional_symbol_column].fillna('', inplace=True)
-    #In the mitocarta_mouse_data there are several synonyms which are not string, in order to remove these I wrote the  following line of code:
-    mitocarta_species_dataframe[additional_symbol_column].where(cond=[True if type(x) == str else False for x in mitocarta_species_dataframe[additional_symbol_column].str.split("|")],
-                                                  other="-", inplace=True)
+    replace_non_string_elements_in_mitocarta_column(additional_symbol_column, mitocarta_species_dataframe)
     try:
         if use_symbol_column == True and use_additional_symbol_column == True:
             symbol_rows = protein_groups_dataframe["gene_name"].isin([symbol for symbol in protein_groups_dataframe["gene_name"] if
@@ -834,6 +832,21 @@ def is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_spec
         log_error(gui_object, f"An exception occurred while evaluating whether proteins are found in {species_name} mitocarta data set. The mitocarta step will be ignored.", error)
     gui_object.report_status(f"Finished elucidating which proteins are found in the {species_name} mitocarta dataset")
     return protein_groups_dataframe
+
+
+def replace_non_string_elements_in_mitocarta_column(additional_symbol_column, mitocarta_species_dataframe):
+    """
+    In the mitocarta_mouse_data there are several synonyms which are not string, in order to remove these I wrote the  following line of code:
+    input:
+    additional_symbol_column = string
+    mitocarta_species_dataframe = pd.Dataframe
+    output:
+    None
+    """
+    mitocarta_species_dataframe[additional_symbol_column].where(cond=[True if type(x) == str else False for x in
+                                                                      mitocarta_species_dataframe[
+                                                                          additional_symbol_column].str.split("|")],
+                                                                other="-", inplace=True)
 
 
 def cluster_reorder(gui_object, sample_specific_dataframe, method = 'average', metric = 'correlation'):
@@ -868,7 +881,7 @@ def cluster_reorder(gui_object, sample_specific_dataframe, method = 'average', m
         log_error(gui_object, "An exception occured while applying clustering on a sample", error)
         return {}, np.empty([0,0], dtype="float64")
 
-def dump_data_to_excel(gui_object, protein_groups_dataframe, non_selected_dataframe, settings_dict, original_column_order):
+def dump_data_to_excel(gui_object, protein_groups_dataframe, non_selected_dataframe, settings_dict):
     """
     The last part of this script, dump the complexome profiling data into an excel file.
     input:
@@ -885,8 +898,8 @@ def dump_data_to_excel(gui_object, protein_groups_dataframe, non_selected_datafr
         workbook = writer.book
 
         ordered_columns = get_ordered_sample_columns(protein_groups_dataframe)
-        protein_groups_dataframe = order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, original_column_order, settings_dict)
-        non_selected_dataframe = order_complexome_profiling_dataframe(non_selected_dataframe, [], original_column_order, settings_dict)
+        protein_groups_dataframe = order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, settings_dict)
+        non_selected_dataframe = order_complexome_profiling_dataframe(non_selected_dataframe, [], settings_dict)
 
         protein_groups_dataframe.to_excel(writer, sheet_name = 'data', index=False)
         non_selected_dataframe.to_excel(writer, sheet_name = 'filtered away proteins', index=False)
@@ -915,19 +928,20 @@ def make_hyperlink(hyperlink):
     else:
         return ""
 
-def order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, original_column_order, settings_dict):
+def order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_columns, settings_dict):
     """
     Define the order of the output dataframe. Set the first column to be a identifier column and the rest is not interesting. 
     input:
     protein_groups_dataframe = pd.DataFrame()
-    ordered_columns = list, list of column names
+    ordered_columns = list, list of column names representing the samples
     original_column_order = pd.Series(), original column order
     settings_dict = dict, dictionary with user defined settings
     output:
     protein_groups_dataframe = pd.DataFrame
     """
-    original_columns = set(original_column_order).difference(set(ordered_columns))
-    ordered_columns = list(original_columns) + list(ordered_columns)
+    output_column_order = are_output_columns_in_main_dataframe(protein_groups_dataframe.columns, settings_dict["make_excel_file_step"]["output_column_order"])
+    ordered_columns = output_column_order + ordered_columns
+
     for column in protein_groups_dataframe.columns:
         if column in settings_dict["make_excel_file_step"]["identifier_column_names"] and column in ordered_columns:
             ordered_columns.remove(column)
@@ -937,6 +951,25 @@ def order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_colum
 
     protein_groups_dataframe = protein_groups_dataframe.reindex(columns=ordered_columns)
     return protein_groups_dataframe
+
+
+def are_output_columns_in_main_dataframe(main_dataframe_columns, output_column_order):
+    """
+    Check whether the column names in the output_column_order are present in the main dataframe
+    input:
+    main_dataframe_columns = pd.Series(), the column names of the main dataframe
+    output_column_order = list, list of strings
+    output:
+    output_column_order = list, list of strings
+    """
+    present_output_columns = []
+    for output_column in output_column_order:
+        if not output_column in main_dataframe_columns:
+            logging.error(f"The column {output_column} is not present in the main dataframe meaning that it will be ignored.")
+            continue
+        present_output_columns.append(output_column)
+    return present_output_columns
+
 
 def get_ordered_sample_columns(complexome_profiling_dataframe):
     """
@@ -950,6 +983,7 @@ def get_ordered_sample_columns(complexome_profiling_dataframe):
     global_cluster_column = "global_clustered"
     global_total_protein_abundance_column = "global_summed_iBAQ_value"
     sample_names = get_sample_names(complexome_profiling_dataframe)
+    sample_names = order_sample_names_alphabetically(sample_names)
 
     for sample_name in sample_names:
         sample_columns = complexome_profiling_dataframe.filter(regex=f"iBAQ {sample_name}_").columns
@@ -961,6 +995,18 @@ def get_ordered_sample_columns(complexome_profiling_dataframe):
     ordered_columns.append(global_cluster_column)
     ordered_columns.append(global_total_protein_abundance_column)
     return ordered_columns
+
+
+def order_sample_names_alphabetically(sample_names):
+    """
+    Order the input list in alphabetical order
+    input:
+    sample_names = list, list of strings
+    output:
+    sample_names = list, list of strings
+    """
+    return sorted(sample_names)
+
 
 def get_sample_positions(column_names):
     """
@@ -1048,10 +1094,10 @@ def filter_dataframe_step(gui_object, protein_groups_dataframe, settings_dict):
         add_protein_abundance_columns(protein_groups_dataframe)
 
         gui_object.report_status("Step 1, filtering the dataframe, is finished")
-        return protein_groups_dataframe, filtered_groups_dataframe, protein_groups_dataframe.columns
+        return protein_groups_dataframe, filtered_groups_dataframe
     else:
         gui_object.report_status("Step 1 (filtering the columns and rows of the main dataframe)\nhas been disabled and will be skipped")
-        return protein_groups_dataframe, pd.DataFrame(), pd.Series()
+        return protein_groups_dataframe, pd.DataFrame()
 
 
 def add_protein_abundance_columns(protein_groups_dataframe):
@@ -1221,7 +1267,7 @@ def apply_clustering_step(gui_object, settings_dict, protein_groups_dataframe):
         gui_object.report_status("Step 4, clustering the fractions per sample using hierarchical clustering has been disabled.")
 
     return protein_groups_dataframe
-def dump_to_excel_step(gui_object, protein_groups_dataframe, filtered_groups_dataframe, settings_dict, original_column_order):
+def dump_to_excel_step(gui_object, protein_groups_dataframe, filtered_groups_dataframe, settings_dict):
     """
     write away dataframe to an excel file:
     input:
@@ -1232,7 +1278,7 @@ def dump_to_excel_step(gui_object, protein_groups_dataframe, filtered_groups_dat
     None
     """
     if settings_dict["steps_dict"]["make_excel_file_step"] == True:
-        dump_data_to_excel(gui_object, protein_groups_dataframe, filtered_groups_dataframe, settings_dict, original_column_order)
+        dump_data_to_excel(gui_object, protein_groups_dataframe, filtered_groups_dataframe, settings_dict)
     else:
         logging.info("Step 5, writing away the data to an excel file, will not be executed because the user has disabled the step.")
         return

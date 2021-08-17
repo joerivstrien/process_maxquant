@@ -2,8 +2,8 @@
 "steps_dict":
     {
         "filtering_step":1,
-        "uniprot_step":1,
-        "mitocarta_step":1,
+        "uniprot_step":0,
+        "mitocarta_step":0,
         "clustering_step":1,
         "make_excel_file_step":1
     },
@@ -80,6 +80,7 @@
 "make_excel_file_step":
     {
         "excel_file_name":"processed_maxquant_file.xlsx",
-        "identifier_column_names":["Majority protein IDs", "Protein IDs", "Fasta headers"]
+        "identifier_column_names":["Majority protein IDs", "Protein IDs", "Fasta headers"],
+	"output_column_order":["Fasta headers", "Majority protein IDs", "Razor + unique peptides", "identifier", "Sequence length", "Mol. weight [kDa]", "PEP", "iBAQ", "MS/MS Count", "Intensity", "Number of proteins"]
     }
 }
