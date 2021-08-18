@@ -943,10 +943,7 @@ def order_complexome_profiling_dataframe(protein_groups_dataframe, ordered_colum
     ordered_columns = output_column_order + ordered_columns
 
     for column in protein_groups_dataframe.columns:
-        if column in settings_dict["make_excel_file_step"]["identifier_column_names"] and column in ordered_columns:
-            ordered_columns.remove(column)
-            ordered_columns.insert(0, column)
-        elif column not in ordered_columns:
+        if column not in ordered_columns:
             ordered_columns.append(column)
 
     protein_groups_dataframe = protein_groups_dataframe.reindex(columns=ordered_columns)
@@ -1194,11 +1191,11 @@ def is_protein_in_mitocarta_step(gui_object, settings_dict, protein_groups_dataf
             return None, False
 
         protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_mouse_dataframe,
-                                                           settings_dict["mitocarta_step"]["mitocarta_mouse_organism"], "mitocarta_mouse_presency",
+                                                           "Mus musculus", "mitocarta_mouse_presency",
                                                            settings_dict["mitocarta_step"]["mitocarta_symbol_column"], settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"],
                                                            settings_dict["mitocarta_step"]["evaluate_symbol_column"], settings_dict["mitocarta_step"]["evaluate_additional_symbol_column"])
         protein_groups_dataframe = is_protein_in_mitocarta(gui_object, protein_groups_dataframe, mitocarta_human_dataframe,
-                                                           settings_dict["mitocarta_step"]["mitocarta_human_organism"], "mitocarta_human_presency",
+                                                           "Homo sapiens", "mitocarta_human_presency",
                                                            settings_dict["mitocarta_step"]["mitocarta_symbol_column"], settings_dict["mitocarta_step"]["mitocarta_additional_symbol_column"],
                                                            settings_dict["mitocarta_step"]["evaluate_symbol_column"], settings_dict["mitocarta_step"]["evaluate_additional_symbol_column"])
 
