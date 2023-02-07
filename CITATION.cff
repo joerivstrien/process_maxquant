@@ -7,6 +7,7 @@ authors:
   given-names: "Joeri"
   orcid: "https://orcid.org/0000-0003-4285-4429"
 title: "Maxquant output processing for Complexome Profiling>"
+version: 1.1
 doi: 10.5281/zenodo.7615559 
 date-released: 2021-08-03
 url: "https://github.com/joerivstrien/process_maxquant"
